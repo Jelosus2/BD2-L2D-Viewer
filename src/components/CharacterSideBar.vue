@@ -19,7 +19,23 @@
           :alt="char.costumeName"
           class="w-16 h-16 object-cover rounded-[50%]"
         />
-        <span class="text-lg pl-2">{{ char.charName + ': ' + char.costumeName }}</span>
+        <div class="flex-grow pl-2">
+          <span class="text-lg">{{ char.charName + ': ' + char.costumeName }}</span>
+        </div>
+        <div class="flex flex-shrink-0 gap-1 pr-2">
+          <div
+            v-if="char.dating"
+            class="w-auto h-6 px-2 bg-blue-500 text-white flex items-center justify-center text-xs font-bold rounded"
+          >
+            FG
+          </div>
+          <div
+            v-if="char.cutscene"
+            class="w-auto h-6 px-2 bg-purple-500 text-white flex items-center justify-center text-xs font-bold rounded"
+          >
+            U
+          </div>
+        </div>
       </div>
     </div>
   </div>
