@@ -22,7 +22,7 @@
         <div class="flex-grow pl-2">
           <span class="text-lg">{{ char.charName + ': ' + char.costumeName }}</span>
         </div>
-        <div class="flex flex-shrink-0 gap-1 pr-2">
+        <div class="flex flex-shrink-0 gap-1 pl-2 pr-2">
           <div
             v-if="char.dating"
             class="w-auto h-6 px-2 bg-blue-500 text-white flex items-center justify-center text-xs font-bold rounded"
