@@ -52,12 +52,18 @@
             <option v-for="name in animations" :key="name" :value="name">{{ name }}</option>
           </select>
         </div>
-        <div class="absolute top-14 left-4 lg:hidden z-50">
+        <div class="absolute top-14 left-4 lg:hidden z-50 flex flex-row gap-2">
           <button
             v-show="!overlayActive && store.characters.find(c => c.id === store.selectedCharacterId)?.datingHasNoBg && store.animationCategory === 'dating'"
             @click="store.showDatingBg = !store.showDatingBg"
           >
             <BgToggleIcon :active="store.showDatingBg" />
+          </button>
+          <button
+            v-show="!overlayActive"
+            @click="store.layerSelectionEnabled = !store.layerSelectionEnabled"
+          >
+            <LayerSelectIcon :active="store.layerSelectionEnabled" />
           </button>
         </div>
         <SpineViewer
@@ -119,6 +125,7 @@ import MenuIcon from '@/components/icons/MenuIcon.vue';
 import PauseIcon from '@/components/icons/PauseIcon.vue';
 import PlayIcon from '@/components/icons/PlayIcon.vue';
 import BgToggleIcon from '@/components/icons/BgToggleIcon.vue';
+import LayerSelectIcon from '@/components/icons/LayerSelectIcon.vue';
 
 const store = useCharacterStore()
 

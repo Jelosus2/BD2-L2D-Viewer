@@ -16,14 +16,22 @@
       >
         <BgEditIcon />
       </button>
-      <button
-        ref="datingToggleRef"
-        v-show="store.characters.find(c => c.id === store.selectedCharacterId)?.datingHasNoBg && store.animationCategory === 'dating'"
-        @click="store.showDatingBg = !store.showDatingBg"
-        class="w-8 h-8 p-1.5 rounded-md hidden lg:flex items-center justify-center bg-gray-800/70 hover:bg-gray-700/70 text-white transition-colors"
-      >
-        <BgToggleIcon :active="store.showDatingBg" />
-      </button>
+      <div class="flex flex-row gap-2">
+        <button
+          ref="datingToggleRef"
+          v-show="store.characters.find(c => c.id === store.selectedCharacterId)?.datingHasNoBg && store.animationCategory === 'dating'"
+          @click="store.showDatingBg = !store.showDatingBg"
+          class="w-8 h-8 p-1.5 rounded-md hidden lg:flex items-center justify-center bg-gray-800/70 hover:bg-gray-700/70 text-white transition-colors"
+        >
+          <BgToggleIcon :active="store.showDatingBg" />
+        </button>
+        <button
+          @click="store.layerSelectionEnabled = !store.layerSelectionEnabled"
+          class="w-8 h-8 p-1.5 rounded-md hidden lg:flex items-center justify-center bg-gray-800/70 hover:bg-gray-700/70 text-white transition-colors"
+        >
+          <LayerSelectIcon :active="store.layerSelectionEnabled" />
+        </button>
+      </div>
     </div>
     <div ref="viewerWrapper" class="relative w-full h-full">
       <div class="absolute inset-0 overflow-hidden" :style="backgroundContainerStyle">
@@ -100,6 +108,7 @@ import type { SpinePlayerInternal } from '@/types/spine-player-internal'
 
 import BgEditIcon from '@/components/icons/BgEditIcon.vue'
 import BgToggleIcon from '@/components/icons/BgToggleIcon.vue'
+import LayerSelectIcon from '@/components/icons/LayerSelectIcon.vue'
 
 type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
 type SpineSlot = {
@@ -1075,6 +1084,12 @@ watch(() => store.showDatingBg, () => {
   void load()
 })
 
+watch(() => store.layerSelectionEnabled, enabled => {
+  if (!enabled) {
+    store.selectedLayerName = null
+  }
+})
+
 watch(showingMobileOverlay, value => {
   if (value) {
     editingBackground.value = false
@@ -1106,7 +1121,7 @@ function getCameraState() {
 }
 
 function onViewerPointerDown(e: PointerEvent) {
-  if (!player || editingBackground.value) return
+  if (!store.layerSelectionEnabled || !player || editingBackground.value) return
   if (e.button !== 0) return
 
   const bounds = viewerWrapper.value?.getBoundingClientRect()
@@ -1167,7 +1182,7 @@ function drawOverlay() {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
   const selectedLayer = store.selectedLayerName
-  if (!selectedLayer) return
+  if (!selectedLayer || !store.layerSelectionEnabled) return
 
   const skeleton = player.skeleton
   if (!skeleton) return
