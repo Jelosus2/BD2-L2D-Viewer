@@ -293,8 +293,10 @@ let externalSkeletonCache = new Map<string, Promise<ExternalSkeletonAsset>>()
 const MIN_ZOOM_FACTOR = 0.08
 const MAX_ZOOM_FACTOR = 4
 const ZOOM_STEP_FACTOR = 1.2
-const WHEEL_ZOOM_SENSITIVITY = 0.0015
+const WHEEL_ZOOM_STEP_PIXELS = 180
+const WHEEL_ZOOM_SENSITIVITY = Math.log(ZOOM_STEP_FACTOR) / WHEEL_ZOOM_STEP_PIXELS
 const WHEEL_LINE_HEIGHT_PX = 16
+const ZOOM_EPSILON = 1e-6
 
 let offset = new Vector2()
 let size = new Vector2()
@@ -1883,7 +1885,10 @@ async function load() {
       new CameraController(p.canvas!, manualCamera)
       if (detachCameraListeners) detachCameraListeners()
       const handlePointerMove = () => requestPausedCompositeRender()
-      const handleWheel = (event: WheelEvent) => zoomFromWheel(event)
+      const handleWheel = (event: WheelEvent) => {
+        zoomFromWheel(event)
+        requestPausedCompositeRender()
+      }
       canvas.addEventListener('pointermove', handlePointerMove)
       canvas.addEventListener('wheel', handleWheel, { passive: false, capture: true })
       detachCameraListeners = () => {
@@ -2292,7 +2297,7 @@ function zoomFromWheel(event: WheelEvent) {
   const wheelDelta = getWheelDeltaPixels(event, canvasRect.height)
   const { min, max } = getZoomBounds()
   const nextZoom = Math.min(Math.max(prevZoom * Math.exp(wheelDelta * WHEEL_ZOOM_SENSITIVITY), min), max)
-  if (Math.abs(nextZoom - prevZoom) < 0.000001) return
+  if (Math.abs(nextZoom - prevZoom) < ZOOM_EPSILON) return
 
   const nx = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1
   const ny = 1 - ((event.clientY - canvasRect.top) / canvasRect.height) * 2
