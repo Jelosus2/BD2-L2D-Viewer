@@ -395,48 +395,6 @@ function setSpineAnimation(
         }
       }
 
-      function getWheelDeltaPixels(event: WheelEvent, pageHeight: number) {
-        if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-          return event.deltaY * WHEEL_LINE_HEIGHT_PX
-        }
-        if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-          return event.deltaY * pageHeight
-        }
-        return event.deltaY
-      }
-
-      function zoomFromWheel(event: WheelEvent) {
-        if (!manualCamera || !player?.canvas) return
-
-        event.preventDefault()
-        event.stopPropagation()
-
-        const canvasRect = player.canvas.getBoundingClientRect()
-        if (canvasRect.width <= 0 || canvasRect.height <= 0) return
-
-        const prevZoom = manualCamera.zoom
-        const wheelDelta = getWheelDeltaPixels(event, canvasRect.height)
-        const nextZoom = Math.min(
-          Math.max(prevZoom * Math.exp(wheelDelta * WHEEL_ZOOM_SENSITIVITY), getZoomBounds().min),
-          getZoomBounds().max,
-        )
-        if (Math.abs(nextZoom - prevZoom) < 0.000001) return
-
-        const nx = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1
-        const ny = 1 - ((event.clientY - canvasRect.top) / canvasRect.height) * 2
-
-        const worldX = nx * (manualCamera.viewportWidth / 2) * prevZoom + manualCamera.position.x
-        const worldY = ny * (manualCamera.viewportHeight / 2) * prevZoom + manualCamera.position.y
-
-        manualCamera.zoom = nextZoom
-        manualCamera.position.x = worldX - nx * (manualCamera.viewportWidth / 2) * nextZoom
-        manualCamera.position.y = worldY - ny * (manualCamera.viewportHeight / 2) * nextZoom
-        manualCamera.update()
-
-        if (compositeActive && overlayInstances.length > 0 && !store.playing) {
-          requestPausedCompositeRender()
-        }
-      }
       return
     }
   }
@@ -2306,6 +2264,47 @@ function setCameraZoom(nextZoom: number) {
   const { min, max } = getZoomBounds()
   manualCamera.zoom = Math.min(Math.max(nextZoom, min), max)
   manualCamera.update()
+  if (compositeActive && overlayInstances.length > 0 && !store.playing) {
+    requestPausedCompositeRender()
+  }
+}
+
+function getWheelDeltaPixels(event: WheelEvent, pageHeight: number) {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    return event.deltaY * WHEEL_LINE_HEIGHT_PX
+  }
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    return event.deltaY * pageHeight
+  }
+  return event.deltaY
+}
+
+function zoomFromWheel(event: WheelEvent) {
+  if (!manualCamera || !player?.canvas) return
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  const canvasRect = player.canvas.getBoundingClientRect()
+  if (canvasRect.width <= 0 || canvasRect.height <= 0) return
+
+  const prevZoom = manualCamera.zoom
+  const wheelDelta = getWheelDeltaPixels(event, canvasRect.height)
+  const { min, max } = getZoomBounds()
+  const nextZoom = Math.min(Math.max(prevZoom * Math.exp(wheelDelta * WHEEL_ZOOM_SENSITIVITY), min), max)
+  if (Math.abs(nextZoom - prevZoom) < 0.000001) return
+
+  const nx = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1
+  const ny = 1 - ((event.clientY - canvasRect.top) / canvasRect.height) * 2
+
+  const worldX = nx * (manualCamera.viewportWidth / 2) * prevZoom + manualCamera.position.x
+  const worldY = ny * (manualCamera.viewportHeight / 2) * prevZoom + manualCamera.position.y
+
+  manualCamera.zoom = nextZoom
+  manualCamera.position.x = worldX - nx * (manualCamera.viewportWidth / 2) * nextZoom
+  manualCamera.position.y = worldY - ny * (manualCamera.viewportHeight / 2) * nextZoom
+  manualCamera.update()
+
   if (compositeActive && overlayInstances.length > 0 && !store.playing) {
     requestPausedCompositeRender()
   }
