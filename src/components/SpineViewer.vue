@@ -1893,7 +1893,7 @@ async function load() {
       canvas.addEventListener('wheel', handleWheel, { passive: false, capture: true })
       detachCameraListeners = () => {
         canvas.removeEventListener('pointermove', handlePointerMove)
-        canvas.removeEventListener('wheel', handleWheel, true)
+        canvas.removeEventListener('wheel', handleWheel, { capture: true })
       }
 
       selectAnimation()
@@ -2264,14 +2264,18 @@ function getZoomBounds() {
   }
 }
 
+function requestPausedCompositeRenderIfNeeded() {
+  if (compositeActive && overlayInstances.length > 0 && !store.playing) {
+    requestPausedCompositeRender()
+  }
+}
+
 function setCameraZoom(nextZoom: number) {
   if (!manualCamera) return
   const { min, max } = getZoomBounds()
   manualCamera.zoom = Math.min(Math.max(nextZoom, min), max)
   manualCamera.update()
-  if (compositeActive && overlayInstances.length > 0 && !store.playing) {
-    requestPausedCompositeRender()
-  }
+  requestPausedCompositeRenderIfNeeded()
 }
 
 function getWheelDeltaPixels(event: WheelEvent, pageHeight: number) {
@@ -2310,9 +2314,7 @@ function zoomFromWheel(event: WheelEvent) {
   manualCamera.position.y = worldY - ny * (manualCamera.viewportHeight / 2) * nextZoom
   manualCamera.update()
 
-  if (compositeActive && overlayInstances.length > 0 && !store.playing) {
-    requestPausedCompositeRender()
-  }
+  requestPausedCompositeRenderIfNeeded()
 }
 
 function zoomIn() {
