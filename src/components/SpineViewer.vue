@@ -2300,18 +2300,20 @@ function zoomFromWheel(event: WheelEvent) {
   const prevZoom = manualCamera.zoom
   const wheelDelta = getWheelDeltaPixels(event, canvasRect.height)
   const { min, max } = getZoomBounds()
-  const nextZoom = Math.min(Math.max(prevZoom * Math.exp(wheelDelta * WHEEL_ZOOM_SENSITIVITY), min), max)
+  const unclampedZoom = prevZoom * Math.exp(wheelDelta * WHEEL_ZOOM_SENSITIVITY)
+  const nextZoom = Math.min(Math.max(unclampedZoom, min), max)
   if (Math.abs(nextZoom - prevZoom) < ZOOM_EPSILON) return
 
-  const nx = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1
-  const ny = 1 - ((event.clientY - canvasRect.top) / canvasRect.height) * 2
+  const normalizedCanvasX = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1
+  const normalizedCanvasY = 1 - ((event.clientY - canvasRect.top) / canvasRect.height) * 2
 
-  const worldX = nx * (manualCamera.viewportWidth / 2) * prevZoom + manualCamera.position.x
-  const worldY = ny * (manualCamera.viewportHeight / 2) * prevZoom + manualCamera.position.y
+  // Convert cursor position from normalized canvas coordinates to world coordinates before zoom.
+  const worldX = normalizedCanvasX * (manualCamera.viewportWidth / 2) * prevZoom + manualCamera.position.x
+  const worldY = normalizedCanvasY * (manualCamera.viewportHeight / 2) * prevZoom + manualCamera.position.y
 
   manualCamera.zoom = nextZoom
-  manualCamera.position.x = worldX - nx * (manualCamera.viewportWidth / 2) * nextZoom
-  manualCamera.position.y = worldY - ny * (manualCamera.viewportHeight / 2) * nextZoom
+  manualCamera.position.x = worldX - normalizedCanvasX * (manualCamera.viewportWidth / 2) * nextZoom
+  manualCamera.position.y = worldY - normalizedCanvasY * (manualCamera.viewportHeight / 2) * nextZoom
   manualCamera.update()
 
   requestPausedCompositeRenderIfNeeded()
