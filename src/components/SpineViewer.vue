@@ -293,6 +293,8 @@ let externalSkeletonCache = new Map<string, Promise<ExternalSkeletonAsset>>()
 const MIN_ZOOM_FACTOR = 0.08
 const MAX_ZOOM_FACTOR = 4
 const ZOOM_STEP_FACTOR = 1.2
+const WHEEL_ZOOM_SENSITIVITY = 0.0015
+const WHEEL_LINE_HEIGHT_PX = 16
 
 let offset = new Vector2()
 let size = new Vector2()
@@ -390,6 +392,49 @@ function setSpineAnimation(
           if (!entry) continue
           entry.mixDuration = 0
           entry.mixTime = 0
+        }
+      }
+
+      function getWheelDeltaPixels(event: WheelEvent, pageHeight: number) {
+        if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+          return event.deltaY * WHEEL_LINE_HEIGHT_PX
+        }
+        if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+          return event.deltaY * pageHeight
+        }
+        return event.deltaY
+      }
+
+      function zoomFromWheel(event: WheelEvent) {
+        if (!manualCamera || !player?.canvas) return
+
+        event.preventDefault()
+        event.stopPropagation()
+
+        const canvasRect = player.canvas.getBoundingClientRect()
+        if (canvasRect.width <= 0 || canvasRect.height <= 0) return
+
+        const prevZoom = manualCamera.zoom
+        const wheelDelta = getWheelDeltaPixels(event, canvasRect.height)
+        const nextZoom = Math.min(
+          Math.max(prevZoom * Math.exp(wheelDelta * WHEEL_ZOOM_SENSITIVITY), getZoomBounds().min),
+          getZoomBounds().max,
+        )
+        if (Math.abs(nextZoom - prevZoom) < 0.000001) return
+
+        const nx = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1
+        const ny = 1 - ((event.clientY - canvasRect.top) / canvasRect.height) * 2
+
+        const worldX = nx * (manualCamera.viewportWidth / 2) * prevZoom + manualCamera.position.x
+        const worldY = ny * (manualCamera.viewportHeight / 2) * prevZoom + manualCamera.position.y
+
+        manualCamera.zoom = nextZoom
+        manualCamera.position.x = worldX - nx * (manualCamera.viewportWidth / 2) * nextZoom
+        manualCamera.position.y = worldY - ny * (manualCamera.viewportHeight / 2) * nextZoom
+        manualCamera.update()
+
+        if (compositeActive && overlayInstances.length > 0 && !store.playing) {
+          requestPausedCompositeRender()
         }
       }
       return
@@ -1880,12 +1925,12 @@ async function load() {
       new CameraController(p.canvas!, manualCamera)
       if (detachCameraListeners) detachCameraListeners()
       const handlePointerMove = () => requestPausedCompositeRender()
-      const handleWheel = () => requestPausedCompositeRender()
+      const handleWheel = (event: WheelEvent) => zoomFromWheel(event)
       canvas.addEventListener('pointermove', handlePointerMove)
-      canvas.addEventListener('wheel', handleWheel, { passive: true })
+      canvas.addEventListener('wheel', handleWheel, { passive: false, capture: true })
       detachCameraListeners = () => {
         canvas.removeEventListener('pointermove', handlePointerMove)
-        canvas.removeEventListener('wheel', handleWheel)
+        canvas.removeEventListener('wheel', handleWheel, true)
       }
 
       selectAnimation()
