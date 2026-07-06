@@ -616,7 +616,7 @@ export default {
     "charName": "Nebris",
     "costumeName": "Lucky Bikini",
     "spine": "char003392",
-    "cutscene": "",
+    "cutscene": "cutscene_char003392",
     "dating": ""
   },
   "003401": {
@@ -986,7 +986,7 @@ export default {
     "charName": "Elise",
     "costumeName": "Naive Lady",
     "spine": "char060804",
-    "cutscene": "",
+    "cutscene": "cutscene_char060804",
     "dating": ""
   },
   "061001": {

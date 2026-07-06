@@ -126,6 +126,24 @@ const cutsceneComposites: Record<string, CutsceneCompositeEntry> = {
         "cut_A_front_arm"
       ]]
     }
+  ],
+  "003392": [
+    {
+      name: "cut_A_all",
+      composite: [[
+        "cut_A_slot",
+        "cut_A_light",
+        "cut_A_ch"
+      ]]
+    },
+    {
+      name: "loop_1_all",
+      composite: [[
+        "loop_1_slot",
+        "loop_1_light",
+        "loop_1_ch"
+      ]]
+    }
   ]
 }
 
