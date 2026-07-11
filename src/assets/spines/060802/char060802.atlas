@@ -1,542 +1,568 @@
 char060802.png
-size:2048,2048
+size:2048,1024
 filter:Linear,Linear
 1 eyebrow_shy_R
-bounds:1865,1700,20,16
+bounds:1160,789,20,16
 10 eyebrow_temptation_L
-bounds:1223,1595,30,15
+bounds:241,310,30,15
 10_leg ribbon(R)_1
-bounds:1092,1804,29,52
+bounds:1927,469,29,52
 offsets:2,1,31,53
 11 eyebrow_temptation_R
-bounds:1074,2004,19,13
+bounds:1013,583,19,13
 offsets:0,0,19,14
 11_leg(R)_stand_2
-bounds:1134,1425,169,697
+bounds:1134,216,169,697
 rotate:90
 12 eyeline(R)_temptation
-bounds:1925,1669,30,26
+bounds:962,667,30,26
 13 eyeline(L)_temptation
-bounds:727,1507,33,26
+bounds:727,298,33,26
 offsets:0,3,33,29
 13_lowerarm(R)_stand_4
-bounds:1702,1996,35,50
+bounds:1812,341,35,50
 14 mouth_temptation
-bounds:534,1478,27,22
+bounds:1318,201,27,22
 14_lowerarm(R)_stand_5
-bounds:740,1282,66,140
+bounds:740,73,66,140
 offsets:5,1,71,141
 rotate:90
 15 blush_temptation
-bounds:1243,1259,207,176
+bounds:1243,50,207,176
 offsets:13,0,220,176
 15_lowerarm(R)_stand_6
-bounds:941,1228,42,99
+bounds:282,22,42,99
 rotate:90
 16 eye_temptation_L
-bounds:726,1810,17,20
+bounds:1998,92,17,20
 26 eye_cry_L
-bounds:726,1810,17,20
+bounds:1998,92,17,20
 33 eye_bluff_L
-bounds:726,1810,17,20
+bounds:1998,92,17,20
 49 eye_serious _L
-bounds:726,1810,17,20
+bounds:1998,92,17,20
 16_lowerarm(R)_stand_7
-bounds:1970,1877,48,169
+bounds:1970,668,48,169
 18 tear_cry
-bounds:155,1272,64,34
+bounds:171,29,64,34
 18_string_5_back
-bounds:998,1736,53,62
+bounds:998,527,53,62
 19 eyebrow_cry_L
-bounds:743,1879,14,18
+bounds:743,670,14,18
 2 eyebrow_shy_L
-bounds:1040,1520,36,16
+bounds:1040,311,36,16
 20 eyebrow_cry_R
-bounds:947,1617,35,11
+bounds:219,314,35,11
 21 eyeline_cry_L
-bounds:524,1286,34,25
+bounds:853,146,34,25
 21_leg ribbon(L)_stand_1
-bounds:1591,1698,48,64
+bounds:1591,489,48,64
 22 eyeline_cry_R
-bounds:1221,1428,25,21
+bounds:1825,554,25,21
 22_leg ribbon(L)_stand_2
-bounds:2015,1360,31,47
+bounds:876,118,31,47
 offsets:0,1,31,48
 23 mouth_cry
-bounds:1110,2027,26,19
+bounds:1402,443,26,19
 23_leg ribbon(L)_stand_4
-bounds:543,1282,42,23
+bounds:777,137,42,23
 offsets:0,2,42,25
 24 face_cry
-bounds:1483,1260,207,176
+bounds:1483,51,207,176
 offsets:13,0,220,176
 rotate:180
 24_leg ribbon(L)_stand_3
-bounds:517,1214,54,91
+bounds:1106,8,54,91
 rotate:90
 25 eye_cry_R
-bounds:1929,1699,16,14
+bounds:994,673,16,14
 50 eye_serious_R
-bounds:1929,1699,16,14
+bounds:994,673,16,14
 25_leg(L)_stand_1
-bounds:2,1369,165,675
+bounds:2,160,165,675
 rotate:90
 27_clothes_stand_1
-bounds:769,1466,101,299
+bounds:769,257,101,299
 rotate:90
 28 eyebrow_bluff_L
-bounds:226,1410,28,23
+bounds:226,201,28,23
 28_clothes_stand_5
-bounds:1328,1576,269,470
+bounds:1328,367,269,470
 offsets:0,0,269,510
 29 eyebrow_bluff_R
-bounds:1079,1942,20,10
+bounds:1865,497,20,10
 3 eyeline_shy_R
-bounds:1579,1717,26,20
+bounds:1579,508,26,20
 30 eyeline(R)_bluff
-bounds:1964,1615,25,25
+bounds:1964,406,25,25
 offsets:0,0,25,26
 30_hair(R)_1
-bounds:171,1256,71,85
-rotate:90
+bounds:1868,45,71,85
+rotate:180
 31 eyeline(L)_bluff
-bounds:64,1293,32,27
+bounds:837,70,32,27
 31_hair(R)_2
-bounds:159,1310,64,117
+bounds:159,101,64,117
 32 mouth_bluff
-bounds:1909,1515,30,23
+bounds:1909,306,30,23
 32_hair(R)_4
-bounds:875,1329,43,46
+bounds:534,273,43,46
 35 eyebrow_annoy_L
-bounds:1135,1969,30,27
+bounds:1135,760,30,27
 offsets:1,5,32,33
 36 eyebrow_annoy_R
-bounds:1565,2034,21,12
+bounds:726,607,21,12
 37 eyeline_annoy_L
-bounds:151,1348,32,27
+bounds:1580,53,32,27
 73 eyeline_embarrass _L
-bounds:151,1348,32,27
+bounds:1580,53,32,27
 38 eyeline_annoy_R
-bounds:86,1391,25,20
+bounds:1881,158,25,20
 74 eyeline_embarrass_R
-bounds:86,1391,25,20
+bounds:1881,158,25,20
 39 mouth_annoy
-bounds:1603,1603,29,22
+bounds:1603,394,29,22
 offsets:0,0,30,23
 4 eyeline_shy_L
-bounds:586,1357,33,27
+bounds:705,55,33,27
 offsets:0,0,34,27
 41 eye_annoy_R
-bounds:1614,1425,17,18
+bounds:1414,196,17,18
 76 eye_embarrass_L
-bounds:1614,1425,17,18
+bounds:1414,196,17,18
 42 eye_annoy_L
-bounds:1633,2033,13,13
+bounds:976,824,13,13
 77 eye_embarrass_R
-bounds:1633,2033,13,13
+bounds:976,824,13,13
 44 eyebrow_serious_L
-bounds:1107,1945,32,23
+bounds:1107,736,32,23
 45 eyebrow_serious_R
-bounds:761,1684,22,8
+bounds:761,475,22,8
 46 eyeline_serious_L
-bounds:837,1280,32,26
+bounds:672,44,32,26
 47 eyeline_serious_R
-bounds:1386,1516,26,19
+bounds:1277,367,26,19
 offsets:0,1,26,20
 48 mouth_serious
-bounds:1970,1561,26,19
+bounds:1970,352,26,19
 4_pistol_1
-bounds:1750,1555,65,103
+bounds:1750,346,65,103
 offsets:0,0,66,103
 5 mouth_shy
-bounds:726,2032,20,14
+bounds:726,823,20,14
 53 eyebrow_avomine_R
-bounds:1032,1816,18,16
+bounds:975,657,18,16
 54 eyebrow_avomine_L
-bounds:2,1522,35,12
+bounds:2,313,35,12
 offsets:0,1,35,13
 55 mouth_avomine
-bounds:1893,2030,23,16
+bounds:1893,821,23,16
 56 eyeline_avomine_L
-bounds:1882,1314,32,27
+bounds:1171,76,32,27
 57 eyeline_avomine_R
-bounds:1410,1403,26,20
+bounds:1221,219,26,20
 58 face_avomine
-bounds:225,1262,207,176
+bounds:225,53,207,176
 offsets:13,0,220,176
 rotate:180
 59 eye_avomine_R
-bounds:409,1510,17,18
+bounds:1284,819,17,18
 5_pistol_2
-bounds:1910,1277,86,72
+bounds:1910,68,86,72
 6 face_shy
-bounds:1660,1271,207,176
+bounds:1660,62,207,176
 offsets:13,0,220,176
 rotate:180
 60 eye_avomine_L
-bounds:854,2033,13,13
+bounds:854,824,13,13
 61 eyeball_avomine_L
-bounds:726,1774,33,32
+bounds:2012,505,33,32
 62 eyeball_avomine_R
-bounds:1815,1581,22,23
+bounds:2022,267,22,23
 64 eyebrow_laugh_L
-bounds:988,1351,32,21
+bounds:17,103,32,21
 65 eyebrow_laugh_R
-bounds:938,2036,18,10
+bounds:1086,733,18,10
 66  eyes(L)_laugh
-bounds:1861,1716,37,30
+bounds:488,175,37,30
 offsets:0,2,38,32
 67  eyes(R)_laugh
-bounds:1722,1977,26,22
+bounds:1659,216,26,22
 offsets:0,0,26,23
 68 mouth_laugh
-bounds:1318,1409,30,23
+bounds:1864,168,30,23
 6_pistol_3
-bounds:1859,2007,36,39
+bounds:1859,798,36,39
 7 eye_shy _L
-bounds:1638,1398,19,20
+bounds:95,181,19,20
 70 eyebrow_embarrass_L
-bounds:1066,1424,31,23
+bounds:1066,215,31,23
 71 eyebrow_embarrass_R
-bounds:991,1959,23,9
+bounds:1067,795,23,9
 72 sweat_embarrass
-bounds:990,2030,8,16
+bounds:1698,821,8,16
 75 mouth_embarrass
-bounds:1828,1763,26,19
+bounds:911,753,26,19
 offsets:0,1,26,20
 79 eyebrow_depress_L
-bounds:1433,2034,39,12
+bounds:1434,825,39,12
 8 eye_shy_R
-bounds:1184,2032,16,14
+bounds:1184,823,16,14
 80 eyebrow_depress_R
-bounds:1180,2014,16,16
+bounds:1317,781,16,16
 81 eyeline_depress_L
-bounds:1046,1940,34,25
+bounds:1096,812,34,25
 82 eyeline_depress_R
-bounds:1448,1586,25,19
+bounds:759,268,25,19
 83 mouth_depress
-bounds:1162,1999,16,15
+bounds:1634,822,16,15
 84 eye_depress_L
-bounds:457,1401,19,20
+bounds:407,299,19,20
 85 eye_depress_R
-bounds:726,1872,15,14
+bounds:726,663,15,14
 8_leg ribbon(R)
-bounds:963,1373,67,43
+bounds:963,164,67,43
 9_레이어 1097
-bounds:1561,1831,22,54
+bounds:1561,622,22,54
 arm(R)_1
-bounds:869,1958,88,205
+bounds:869,749,88,205
 offsets:0,69,180,274
 rotate:90
 arm(R)_2
-bounds:1748,1781,109,88
+bounds:1748,572,109,88
 rotate:90
 arm(R)_2_1
-bounds:1307,2006,50,40
+bounds:1052,618,48,38
+offsets:1,1,50,40
 arm(R)_2_10
-bounds:1542,1517,55,33
+bounds:1041,806,53,31
+offsets:1,1,55,33
 arm(R)_2_11
-bounds:934,1575,67,40
+bounds:1305,799,65,38
+offsets:1,1,67,40
 arm(R)_2_12
-bounds:1002,2023,45,23
+bounds:1411,305,42,21
+offsets:1,1,45,23
 arm(R)_2_13
-bounds:1599,2008,32,38
+bounds:726,566,30,36
+offsets:1,1,32,38
 arm(R)_2_14
-bounds:2020,1977,25,34
+bounds:2023,157,23,32
+offsets:1,1,25,34
 arm(R)_2_3
-bounds:1003,1568,33,32
+bounds:1439,379,33,32
 offsets:0,117,75,149
 arm(R)_2_4
-bounds:961,2031,27,15
+bounds:950,824,24,13
+offsets:1,1,27,15
 arm(R)_2_5
-bounds:573,1505,44,23
+bounds:992,816,42,21
+offsets:1,1,44,23
 arm(R)_2_6
-bounds:2022,1476,18,23
+bounds:1486,80,16,21
+offsets:1,1,18,23
 arm(R)_2_7
-bounds:1633,1420,40,24
+bounds:578,297,38,22
+offsets:1,1,40,24
 arm(R)_2_8
-bounds:520,1387,27,22
+bounds:461,191,25,20
+offsets:1,1,27,22
 arm(R)_2_9
-bounds:532,1502,39,26
+bounds:988,731,37,23
+offsets:1,1,39,26
 arm(R)_3
-bounds:931,1541,36,32
+bounds:1372,805,36,32
 arm(R)_3_1
-bounds:2019,2013,26,33
+bounds:2020,472,24,31
+offsets:1,1,26,33
 arm(R)_3_10
-bounds:488,1389,30,25
+bounds:653,142,28,23
+offsets:1,1,30,25
 arm(R)_3_11
-bounds:1085,2020,23,26
+bounds:1117,263,21,24
+offsets:1,1,23,26
 arm(R)_3_12
-bounds:1534,1588,134,193
+bounds:1534,379,134,193
 rotate:90
 arm(R)_3_13
-bounds:1964,1748,73,130
+bounds:1964,539,73,130
 arm(R)_3_14
-bounds:1812,1552,43,25
+bounds:1637,306,41,23
+offsets:1,1,43,25
 arm(R)_3_15
-bounds:1052,1821,38,50
+bounds:1707,789,36,48
+offsets:1,1,38,50
 arm(R)_3_2
-bounds:118,1369,47,37
+bounds:1542,307,45,35
+offsets:1,1,47,37
 arm(R)_3_3
-bounds:1416,1516,44,20
+bounds:363,307,42,18
+offsets:1,1,44,20
 arm(R)_3_4
-bounds:991,1940,45,17
+bounds:1041,733,43,15
+offsets:1,1,45,17
 arm(R)_3_5
-bounds:1398,2035,33,11
+bounds:1562,828,30,9
+offsets:2,1,33,11
 arm(R)_3_6
-bounds:967,1880,42,16
+bounds:1249,387,40,14
+offsets:1,1,42,16
 arm(R)_3_7
-bounds:940,1938,49,33
+bounds:939,731,47,31
+offsets:1,1,49,33
 arm(R)_3_8
-bounds:2,1272,60,55
+bounds:1379,387,58,53
+offsets:1,1,60,55
 arm(R)_3_9
-bounds:1117,1472,16,34
+bounds:1052,661,14,32
+offsets:1,1,16,34
 arm(R)_4
-bounds:1380,1669,31,44
+bounds:769,285,31,44
 arm(R)_5
-bounds:803,1655,33,23
+bounds:803,446,33,23
 arm(R)_6
-bounds:904,1258,57,72
+bounds:904,49,57,72
 arm(R)_7
-bounds:1643,1511,40,27
+bounds:519,167,40,27
 arm(R)_8
-bounds:2005,1501,41,39
+bounds:2005,292,41,39
 arm(R)_skill_1
-bounds:1526,1529,91,202
+bounds:1526,320,91,202
 offsets:0,72,184,274
 rotate:90
 arm(R)_skill_2
-bounds:1075,1954,107,92
+bounds:1075,745,107,92
 arm(R)_skill_4
-bounds:371,1390,33,43
+bounds:371,181,33,43
 arm(R)_skill_5
-bounds:1426,1598,32,25
+bounds:998,360,32,25
 arm(R)_skill_6
-bounds:781,1678,53,75
+bounds:781,469,53,75
 rotate:90
 arm(R)_skill_7
-bounds:1065,1622,38,27
+bounds:1065,413,38,27
 arm(R)_skill_8
-bounds:1817,1407,41,39
+bounds:1817,198,41,39
 back ribbon_1
-bounds:1452,1225,142,101
+bounds:1452,16,142,101
 back ribbon_2
-bounds:159,1235,211,38
+bounds:1823,32,211,38
 back ribbon_3
-bounds:1420,1225,40,67
+bounds:44,29,40,67
 back ribbon_4
-bounds:1720,1611,35,30
+bounds:1720,402,35,30
 offsets:0,1,35,31
 body
-bounds:1585,1547,303,499
+bounds:1585,338,303,499
 rotate:180
 breast
-bounds:1552,1724,52,102
+bounds:1552,515,52,102
 offsets:1,0,53,102
 closed eyes(L)
-bounds:1115,1247,50,44
+bounds:122,156,40,41
+offsets:0,2,50,44
 closed eyes(R)
-bounds:619,1498,26,30
+bounds:618,290,25,29
+offsets:1,1,26,30
 clothes_1
-bounds:2010,1694,36,55
+bounds:1625,181,36,55
 clothes_2
-bounds:428,1476,104,52
+bounds:428,267,104,52
 offsets:1,0,105,52
 clothes_3
-bounds:1901,1805,69,241
+bounds:1901,596,69,241
 clothes_4
-bounds:1991,1534,55,128
+bounds:1991,325,55,128
 clothes_5
-bounds:949,1547,430,499
+bounds:949,338,430,499
 offsets:4,0,434,509
 rotate:180
 ears
-bounds:2020,1933,24,42
+bounds:2019,795,24,42
 eye(L)
-bounds:1052,1875,17,20
+bounds:1858,115,17,20
 eye(R)
-bounds:1541,1724,14,14
+bounds:2032,666,14,14
 eyeball(L)
-bounds:1050,2013,33,33
+bounds:1599,804,33,33
 eyeball(R)
-bounds:1282,2022,22,24
+bounds:1095,592,22,24
 eyebrow_1
-bounds:783,1347,36,23
+bounds:148,142,36,23
 eyebrow_2
-bounds:234,1521,22,13
+bounds:1410,824,22,13
 eyebrow_smile
-bounds:740,1268,69,36
+bounds:739,58,69,36
 eyelash(L)
-bounds:650,1350,32,29
+bounds:933,333,32,29
 eyelash(R)
-bounds:1273,1581,26,23
+bounds:1052,149,26,23
 fore_arm_L_2
-bounds:1372,1525,168,67
+bounds:1372,316,168,67
 gun_1
-bounds:962,1269,155,111
+bounds:962,60,155,111
 rotate:90
 gun_2
-bounds:726,1509,537,407
+bounds:726,300,537,407
 rotate:90
 hair(R)_1
-bounds:1169,1236,67,84
-rotate:90
+bounds:199,16,67,84
 hair(R)_2
-bounds:649,1460,68,117
+bounds:649,251,68,117
 rotate:90
 hair(R)_3
-bounds:726,1689,54,83
+bounds:726,480,54,83
 offsets:0,0,54,87
 hair(R)_4
-bounds:557,1365,47,37
+bounds:557,156,47,37
 offsets:0,0,47,39
 hair_1
-bounds:340,1508,26,67
-rotate:90
+bounds:2018,678,26,67
 hair_10
-bounds:1432,1312,63,111
+bounds:1432,103,63,111
 offsets:2,0,65,111
 hair_12
-bounds:2,1225,76,45
+bounds:550,20,76,45
 hair_13
-bounds:729,1241,59,104
+bounds:729,38,59,104
 offsets:0,2,59,106
 rotate:90
 hair_14
-bounds:726,1530,41,59
+bounds:726,321,41,59
 hair_16
-bounds:1236,1611,33,75
+bounds:1236,402,33,75
 offsets:0,1,33,76
 hair_2
-bounds:1996,1804,50,72
+bounds:1996,595,50,72
 hair_3
-bounds:1541,1607,61,44
+bounds:1541,398,61,44
 hair_4
-bounds:1880,1626,115,91
+bounds:1880,417,115,91
 rotate:90
 hair_5
-bounds:1894,1246,55,109
+bounds:435,47,55,109
 rotate:90
 hair_6
-bounds:828,1249,99,117
+bounds:828,40,99,117
 rotate:270
 hair_7
-bounds:600,1232,86,35
+bounds:1190,26,86,35
 hair_8
-bounds:64,1253,56,93
+bounds:124,43,56,93
 rotate:90
 hair_9
-bounds:902,1958,31,24
+bounds:1715,763,31,24
 head ribbon_1
-bounds:1573,1212,71,59
+bounds:1037,82,71,59
 head ribbon_2
-bounds:1691,1228,101,58
+bounds:1690,27,101,58
 head_blank_closed
-bounds:1075,1285,207,177
+bounds:1075,76,207,177
 offsets:13,0,220,177
 rotate:180
 head_blank_normal
-bounds:1827,1368,207,177
+bounds:1827,159,207,177
 offsets:13,0,220,177
 head_normal
-bounds:726,1504,207,177
+bounds:726,295,207,177
 offsets:13,0,220,177
 heart
-bounds:2020,1670,25,22
+bounds:802,276,23,20
+offsets:1,1,25,22
 leg ribbon(L)_1
-bounds:1085,1564,55,58
+bounds:1085,355,55,58
 leg ribbon(L)_2
-bounds:2023,1883,23,54
+bounds:2023,747,23,54
 leg ribbon(L)_3
-bounds:1955,1207,66,91
+bounds:1393,11,66,91
 rotate:90
 leg ribbon(L)_4
-bounds:1595,1971,33,35
+bounds:1596,767,33,35
 leg ribbon(R)
-bounds:1246,1226,64,43
+bounds:964,21,64,43
 leg ribbon(R)_1
-bounds:1636,1663,38,46
+bounds:1636,454,38,46
 leg ribbon(R)_2
-bounds:768,1480,30,49
+bounds:1380,444,30,49
 offsets:73,1,103,50
 leg(L)_1
-bounds:674,1357,162,441
+bounds:674,148,162,441
 rotate:270
 leg(L)_2
-bounds:1748,1738,172,308
+bounds:1748,529,172,308
 offsets:0,25,172,333
 rotate:180
 leg(R)_1
-bounds:1034,1596,221,200
+bounds:1034,387,221,200
 rotate:270
 leg(R)_2
-bounds:408,1279,330,149
+bounds:408,70,330,149
 mouth_closed
-bounds:1527,1612,25,19
+bounds:1527,403,25,19
 offsets:3,2,32,23
 mouth_kiss
-bounds:799,1486,23,20
+bounds:987,149,21,18
+offsets:1,1,23,20
 mouth_normal
-bounds:1374,1591,24,19
+bounds:1455,307,24,19
 offsets:4,1,32,23
 pistol_1
-bounds:979,1799,71,95
+bounds:979,590,71,95
 pistol_2
-bounds:1890,1554,88,71
+bounds:1890,345,88,71
 pistol_3
-bounds:1948,2002,28,44
+bounds:1948,793,28,44
 ponytail_1
-bounds:1042,1246,120,71
-rotate:90
+bounds:2,40,120,71
 ponytail_2
-bounds:1838,1281,205,116
+bounds:1838,72,205,116
 ponytail_3
-bounds:821,1324,165,77
+bounds:821,115,165,77
 ponytail_4
-bounds:1752,1243,140,60
-rotate:180
+bounds:529,22,140,60
 ponytail_5
-bounds:2,1295,187,122
+bounds:2,86,187,122
 offsets:0,0,197,124
 rotate:180
 ponytail_6
-bounds:1730,1544,79,54
+bounds:1730,335,79,54
 red ribbon_1
-bounds:1599,1514,46,31
+bounds:1589,307,46,31
 red ribbon_2
-bounds:1758,1893,23,33
+bounds:1758,684,23,33
 red ribbon_3
-bounds:1251,1597,32,35
+bounds:594,151,32,35
 rose
-bounds:1379,1606,59,57
+bounds:941,361,59,57
 smile eyes(L)
-bounds:1359,2015,39,31
+bounds:1860,507,39,31
 offsets:0,0,39,34
 smile eyes(R)
-bounds:1223,1686,29,25
-wink eyes(R)
-bounds:1223,1686,29,25
+bounds:1223,477,29,25
 star
-bounds:1882,1989,16,16
+bounds:1882,780,16,16
 string_1
-bounds:1891,1535,108,50
+bounds:1891,326,108,50
 string_2
-bounds:1280,1207,132,79
+bounds:1758,2,132,79
 rotate:180
 string_3
-bounds:431,1253,24,308
+bounds:1020,47,24,308
 offsets:0,0,24,310
 rotate:90
 string_4
-bounds:726,1887,20,61
+bounds:726,678,20,61
 offsets:0,3,20,64
 string_5
-bounds:1162,1710,69,73
+bounds:1162,501,69,73
 string_5_back
-bounds:1744,1790,53,62
+bounds:1744,581,53,62
 table
-bounds:408,1530,316,516
+bounds:408,321,316,516
 tableadd
-bounds:2,1536,404,510
+bounds:2,327,404,510
 upper_arm_L_1
-bounds:1922,1645,96,166
+bounds:1922,436,96,166
+wink eyes(R)
+bounds:2,113,27,23
+offsets:1,1,29,25

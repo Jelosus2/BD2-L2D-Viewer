@@ -152,7 +152,7 @@ export default {
     "charName": "Celia",
     "costumeName": "The Curse",
     "spine": "char101601",
-    "cutscene": "cutscene_char101601",
+    "cutscene": "cutscene_char060401",
     "dating": ""
   },
   "103201": {
@@ -197,6 +197,167 @@ export default {
     "cutscene": "",
     "dating": ""
   },
+  "9016": {
+    "charName": "Marianne Dumain (Npc)",
+    "costumeName": "???",
+    "spine": "illust_talk9016",
+    "cutscene": "",
+    "dating": ""
+  },
+  "9018": {
+    "charName": "Eda (Npc)",
+    "costumeName": "???",
+    "spine": "illust_talk9018",
+    "cutscene": "",
+    "dating": ""
+  },
+  "200551": {
+    "charName": "Determined Researcher (Npc)",
+    "costumeName": "???",
+    "spine": "npc200551",
+    "cutscene": "",
+    "dating": ""
+  },
+  "300103": {
+    "charName": "Garinoth (Npc)",
+    "costumeName": "???",
+    "spine": "npc300103",
+    "cutscene": "",
+    "dating": ""
+  },
+  "300104": {
+    "charName": "Asmode (Npc)",
+    "costumeName": "???",
+    "spine": "npc300104",
+    "cutscene": "",
+    "dating": ""
+  },
+  "300601": {
+    "charName": "Guild Receptionist Liza (Npc)",
+    "costumeName": "???",
+    "spine": "npc300601",
+    "cutscene": "",
+    "dating": ""
+  },
+  "300701": {
+    "charName": "Veila (Npc)",
+    "costumeName": "???",
+    "spine": "npc300701",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400001": {
+    "charName": "Young Liberta (Npc)",
+    "costumeName": "???",
+    "spine": "npc400001",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400017": {
+    "charName": "Young Hansen (Npc)",
+    "costumeName": "???",
+    "spine": "npc400017",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400018": {
+    "charName": "Hansen (Npc)",
+    "costumeName": "???",
+    "spine": "npc400018",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400034": {
+    "charName": "Greta (Npc)",
+    "costumeName": "???",
+    "spine": "npc400034",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400042": {
+    "charName": "Night World Lathel (Npc)",
+    "costumeName": "???",
+    "spine": "npc400042",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400049": {
+    "charName": "King of Rotein Gray (Npc)",
+    "costumeName": "???",
+    "spine": "npc400049",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400050": {
+    "charName": "Spatti (Npc)",
+    "costumeName": "???",
+    "spine": "npc400050",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400056": {
+    "charName": "Eleanor (Npc)",
+    "costumeName": "???",
+    "spine": "npc000005",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400064": {
+    "charName": "Casual Valze (Npc)",
+    "costumeName": "???",
+    "spine": "npc400064",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400070": {
+    "charName": "Nekyndalia (Npc)",
+    "costumeName": "???",
+    "spine": "npc400070",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400098": {
+    "charName": "Casino Rudina (Npc)",
+    "costumeName": "???",
+    "spine": "npc400098",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400100": {
+    "charName": "Rudina (Npc)",
+    "costumeName": "???",
+    "spine": "npc400100",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400123": {
+    "charName": "Valze (Npc)",
+    "costumeName": "???",
+    "spine": "npc400123",
+    "cutscene": "",
+    "dating": ""
+  },
+  "400135": {
+    "charName": "Young Justia (Npc)",
+    "costumeName": "???",
+    "spine": "npc400135",
+    "cutscene": "",
+    "dating": ""
+  },
+  "000001": {
+    "charName": "Roche (Npc)",
+    "costumeName": "???",
+    "spine": "npc000001",
+    "cutscene": "",
+    "dating": ""
+  },
+  "000004": {
+    "charName": "Ailee (Npc)",
+    "costumeName": "???",
+    "spine": "npc000004",
+    "cutscene": "",
+    "dating": ""
+  },
   "000101": {
     "charName": "Lathel",
     "costumeName": "Herb Tracker",
@@ -227,7 +388,7 @@ export default {
   },
   "000105": {
     "charName": "Lathel",
-    "costumeName": "Promise of Vengance",
+    "costumeName": "Promise of Vengeance",
     "spine": "char000105",
     "cutscene": "",
     "dating": ""
@@ -280,7 +441,7 @@ export default {
     "spine": "char000296",
     "cutscene": "cutscene_char000296",
     "dating": "illust_dating7",
-    "datingUsesTracks": true,
+    "datingUsesTracks": true
   },
   "000301": {
     "charName": "Scheherazade",
@@ -355,14 +516,14 @@ export default {
   },
   "000502": {
     "charName": "Rou",
-    "costumeName": "Red Hat",
+    "costumeName": "Red Riding Hood",
     "spine": "char000502",
     "cutscene": "cutscene_char000502",
     "dating": ""
   },
   "000502_c": {
     "charName": "Rou",
-    "costumeName": "Red Hat (Censored)",
+    "costumeName": "Red Riding Hood (Censored)",
     "spine": "char000502_c",
     "cutscene": "",
     "dating": "",
@@ -510,7 +671,7 @@ export default {
     "spine": "char001197",
     "cutscene": "cutscene_char001197",
     "dating": "illust_dating9",
-    "datingUsesTracks": true,
+    "datingUsesTracks": true
   },
   "001201": {
     "charName": "Liatris",
@@ -657,7 +818,7 @@ export default {
   },
   "003602": {
     "charName": "Olivier",
-    "costumeName": "Apostle (Kelian)",
+    "costumeName": "Apostle",
     "spine": "char003602",
     "cutscene": "cutscene_char003602",
     "dating": ""
@@ -725,7 +886,7 @@ export default {
     "spine": "char003892",
     "cutscene": "cutscene_char003892",
     "dating": "illust_dating14",
-    "datingUsesTracks": true,
+    "datingUsesTracks": true
   },
   "003901": {
     "charName": "Sonya",
@@ -757,7 +918,7 @@ export default {
   },
   "004091": {
     "charName": "Darian",
-    "costumeName": "Herald of Enlightment",
+    "costumeName": "Herald of Enlightenment",
     "spine": "char004091",
     "cutscene": "cutscene_char004091",
     "dating": ""
@@ -1380,10 +1541,10 @@ export default {
     "cutscene": "cutscene_char067803",
     "dating": ""
   },
-  "400098": {
-    "charName": "Rudina",
+  "ellin": {
+    "charName": "Ellin (Npc)",
     "costumeName": "???",
-    "spine": "npc400098",
+    "spine": "npc_ellin",
     "cutscene": "",
     "dating": ""
   },

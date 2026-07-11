@@ -1,5 +1,13 @@
 export default [
   {
+    "date": "09/07/2026",
+    "changes": [
+      "Added all the NPC character standing animations (finally).",
+      "Added new filters: Playable Characters and NPCs.",
+      "As always, if you like my work and want to support me so I can keep working on adding more features and improving the site you can do so by donating in either my Ko-Fi or Patreon <3."
+    ]
+  },
+  {
     "date": "02/07/2026",
     "changes": [
       "Added Elise: Naive Lady and Nebris: Lucky Bikini ultimate animations.",

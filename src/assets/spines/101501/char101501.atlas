@@ -1,128 +1,145 @@
 char101501.png
-size:2048,2048
+size:2048,512
 filter:Linear,Linear
-+
-bounds:542,1765,102,102
 arm_(L)_arm1
-bounds:506,605,152,195
+bounds:1586,38,152,195
 arm_(L)_arm2
-bounds:432,1529,141,315
+bounds:359,42,141,315
+rotate:90
 arm_(L)_backhand
-bounds:2,1675,75,90
+bounds:580,169,75,90
 arm_(L)_finger1
-bounds:174,1866,24,37
+bounds:2,21,24,37
 arm_(L)_finger2
-bounds:331,1981,35,65
+bounds:388,417,35,65
 offsets:1,0,36,65
+rotate:90
 arm_(L)_finger3
-bounds:174,1804,38,64
+bounds:253,463,38,64
+rotate:90
 arm_(L)_sword
-bounds:47,282,406,687
+bounds:954,176,325,550
+rotate:90
 arm_(R)_hand_arm1
-bounds:456,1869,178,177
+bounds:165,359,142,142
+rotate:90
 arm_(R)_hand_arm2
-bounds:335,1251,206,316
+bounds:976,38,165,253
+rotate:270
 arm_(R)_hand_finger1
-bounds:248,1592,57,78
+bounds:146,14,46,62
+rotate:270
 arm_(R)_hand_finger2
-bounds:2,1595,61,79
+bounds:205,13,49,63
+rotate:270
 belt
-bounds:483,1490,228,98
+bounds:290,423,182,78
 belt_back
-bounds:487,366,219,78
-offsets:0,0,220,78
+bounds:1656,326,175,62
+offsets:0,0,176,62
+rotate:90
 body1
-bounds:2,875,408,1171
+bounds:2,175,326,937
+rotate:90
 body_cloth
-bounds:400,66,324,543
-offsets:0,9,324,552
-rotate:180
+bounds:1341,39,259,436
+offsets:0,6,259,442
 closed eyes skill1
-bounds:2,1649,26,25
+bounds:97,26,26,25
 closed eyes skill2
-bounds:456,2025,40,21
+bounds:2,164,40,21
 cloth_3
-bounds:530,1358,103,151
+bounds:2,380,82,121
 cloth_4
-bounds:2,1262,150,308
-offsets:0,0,151,317
+bounds:394,178,121,247
+offsets:0,0,121,254
+rotate:270
 cloth_5
-bounds:150,1569,304,477
+bounds:653,184,243,382
+rotate:90
 hair_1
-bounds:2,1781,67,69
+bounds:84,432,67,69
 hair_2
-bounds:244,1972,86,74
+bounds:2,187,86,74
 hair_3
-bounds:541,801,99,90
+bounds:720,22,99,90
 hair_4
-bounds:42,1518,47,96
+bounds:308,392,47,96
+rotate:90
 hair_5
-bounds:453,1854,44,13
+bounds:257,166,44,13
 hair_6
-bounds:238,1709,29,72
+bounds:509,429,29,72
 offsets:0,0,29,73
 hair_7
-bounds:2,1844,40,88
+bounds:474,410,40,88
 hair_8
-bounds:230,1643,48,75
+bounds:20,22,48,75
+rotate:270
 horn
-bounds:191,1691,51,148
+bounds:1001,174,51,148
 offsets:1,1,52,149
 leg_L_1
-bounds:365,671,192,398
-rotate:180
+bounds:656,43,154,318
+rotate:90
 leg_L_2
-bounds:304,2,153,384
+bounds:2,60,122,307
+rotate:90
 leg_L_knee armor
-bounds:525,1189,100,166
+bounds:269,31,80,133
+rotate:90
 normal_eye_1
-bounds:2,1928,11,16
+bounds:109,416,11,16
 normal_eye_2
-bounds:133,2014,14,14
+bounds:153,449,12,12
+offsets:1,1,14,14
 normal_eyebrow 1
-bounds:231,1781,27,13
+bounds:164,405,27,13
 normal_eyebrow 2
-bounds:451,1840,51,17
+bounds:343,398,51,17
 offsets:0,0,52,17
 normal_eyeline_1
-bounds:258,2032,23,14
+bounds:165,487,23,14
 offsets:1,0,24,14
 normal_eyeline_2
-bounds:299,1954,38,17
+bounds:218,162,38,17
 offsets:0,0,39,18
 normal_face_normal
-bounds:448,422,171,181
+bounds:1523,239,171,181
 normal_mouth
-bounds:2,1765,31,19
+bounds:132,416,31,19
 offsets:0,0,32,19
 normal_white eye_1
-bounds:456,1999,26,24
+bounds:25,2,26,24
 normal_white eye_2
-bounds:206,2017,31,29
+bounds:76,406,31,29
 normall_ear
-bounds:368,2005,30,41
+bounds:309,133,30,41
 skill 1_eye_1
-bounds:192,2036,10,10
+bounds:71,493,8,8
+offsets:1,1,10,10
 skill 1_eye_2
-bounds:39,1837,12,11
+bounds:2,492,10,9
+offsets:1,1,12,11
 skill 1_eyebrow1
-bounds:47,1659,28,19
+bounds:431,437,28,19
 skill 1_eyebrow2
-bounds:484,2015,45,16
+bounds:61,175,45,16
 offsets:0,0,49,16
 skill 1_eyeline1
-bounds:118,2029,22,17
+bounds:42,221,22,17
 skill 1_eyeline2
-bounds:36,1764,33,16
+bounds:24,237,33,16
 offsets:0,0,34,16
 skill 1_face
-bounds:407,1078,169,186
-skill 1_mouth
-bounds:292,2008,35,38
-skill 1_white eye_1
-bounds:8,1569,26,24
-skill 1_white eye_2
-bounds:400,2017,31,29
-sword
-bounds:48,41,631,410
+bounds:1395,332,169,186
 rotate:270
+skill 1_mouth
+bounds:128,463,35,38
+skill 1_white eye_1
+bounds:125,5,26,24
+skill 1_white eye_2
+bounds:2,351,31,29
+sword
+bounds:1010,40,505,328
+rotate:180

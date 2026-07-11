@@ -217,12 +217,17 @@ async function onExportAnimation({ format, transparent }: { format: 'video' | 'f
   if (!viewerRef.value) return
   showMobileControls.value = false
   isExporting.value = true
-  if (format === 'frames') {
-    await viewerRef.value.exportAnimationFrames(transparent)
-  } else {
-    await viewerRef.value.exportAnimation(transparent)
+  try {
+    if (format === 'frames') {
+      await viewerRef.value.exportAnimationFrames(transparent)
+    } else {
+      await viewerRef.value.exportAnimation(transparent)
+    }
+  } catch (error) {
+    console.error('Failed to export animation:', error)
+  } finally {
+    isExporting.value = false
   }
-  isExporting.value = false
 }
 
 function onCategoryChange() {

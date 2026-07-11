@@ -10,7 +10,7 @@
       <button
         type="button"
         class="relative w-10 h-10 flex items-center justify-center rounded bg-gray-700 hover:bg-gray-600 transition-colors"
-        :class="hasActiveAnimationFilters ? 'text-indigo-300' : 'text-white'"
+        :class="hasActiveFilters ? 'text-indigo-300' : 'text-white'"
         aria-label="Filter characters"
         @click="filterModalOpen = true"
       >
@@ -20,7 +20,7 @@
           <path d="M10 19h4" />
         </svg>
         <span
-          v-if="hasActiveAnimationFilters"
+          v-if="hasActiveFilters"
           class="absolute right-1.5 top-1.5 w-2 h-2 rounded-full bg-indigo-300"
         />
       </button>
@@ -103,14 +103,36 @@
             <span class="text-sm text-gray-100">Ultimate animations</span>
             <span class="h-6 px-2 bg-purple-500 text-white flex items-center justify-center text-xs font-bold rounded">U</span>
           </button>
+
+          <button
+            type="button"
+            class="w-full flex items-center justify-between gap-3 rounded border px-3 py-3 text-left transition-colors"
+            :class="characterTypeFilter === 'playable' ? 'border-emerald-400 bg-emerald-500/15' : 'border-gray-700 hover:bg-gray-700/70'"
+            :aria-pressed="characterTypeFilter === 'playable'"
+            @click="characterTypeFilter = characterTypeFilter === 'playable' ? 'all' : 'playable'"
+          >
+            <span class="text-sm text-gray-100">Playable characters</span>
+            <span class="h-6 px-2 bg-emerald-500 text-white flex items-center justify-center text-xs font-bold rounded">PC</span>
+          </button>
+
+          <button
+            type="button"
+            class="w-full flex items-center justify-between gap-3 rounded border px-3 py-3 text-left transition-colors"
+            :class="characterTypeFilter === 'npc' ? 'border-amber-400 bg-amber-500/15' : 'border-gray-700 hover:bg-gray-700/70'"
+            :aria-pressed="characterTypeFilter === 'npc'"
+            @click="characterTypeFilter = characterTypeFilter === 'npc' ? 'all' : 'npc'"
+          >
+            <span class="text-sm text-gray-100">NPCs</span>
+            <span class="h-6 px-2 bg-amber-500 text-white flex items-center justify-center text-xs font-bold rounded">NPC</span>
+          </button>
         </div>
 
         <div class="flex justify-end gap-2 mt-5">
           <button
             type="button"
             class="px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="!hasActiveAnimationFilters"
-            @click="resetAnimationFilters"
+            :disabled="!hasActiveFilters"
+            @click="resetFilters"
           >
             Reset filters
           </button>
@@ -132,7 +154,10 @@ const filter = ref('')
 const filterModalOpen = ref(false)
 const showFatedGuestOnly = ref(false)
 const showUltimateOnly = ref(false)
-const hasActiveAnimationFilters = computed(() => showFatedGuestOnly.value || showUltimateOnly.value)
+const characterTypeFilter = ref<'all' | 'playable' | 'npc'>('all')
+const hasActiveFilters = computed(
+  () => showFatedGuestOnly.value || showUltimateOnly.value || characterTypeFilter.value !== 'all',
+)
 
 const filteredCharacters = computed(() =>
   store.characters.filter((c) => {
@@ -140,7 +165,12 @@ const filteredCharacters = computed(() =>
     const matchesSearch = !query || (c.charName + ' ' + c.costumeName).toLowerCase().includes(query)
     const matchesFatedGuest = !showFatedGuestOnly.value || !!c.dating
     const matchesUltimate = !showUltimateOnly.value || !!c.cutscene
-    return matchesSearch && matchesFatedGuest && matchesUltimate
+    const isNpc = c.charName.includes('(Npc)')
+    const matchesCharacterType =
+      characterTypeFilter.value === 'all' ||
+      (characterTypeFilter.value === 'npc' && isNpc) ||
+      (characterTypeFilter.value === 'playable' && !isNpc)
+    return matchesSearch && matchesFatedGuest && matchesUltimate && matchesCharacterType
   })
 )
 
@@ -150,9 +180,10 @@ function select(id: string) {
   store.selectedCharacterId = id
 }
 
-function resetAnimationFilters() {
+function resetFilters() {
   showFatedGuestOnly.value = false
   showUltimateOnly.value = false
+  characterTypeFilter.value = 'all'
 }
 
 function onKeyDown(event: KeyboardEvent) {

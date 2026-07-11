@@ -31,7 +31,7 @@ body_4
 bounds:120,453,97,507
 offsets:2,50,108,568
 body_5
-bounds:469,746,16,17
+bounds:315,579,16,17
 body_6
 bounds:36,469,15,16
 body_7
@@ -162,11 +162,11 @@ rotate:90
 eyeback(L)_touch2
 bounds:502,333,38,34
 eyeback(R)_touch2
-bounds:694,671,28,29
+bounds:436,402,28,29
 eyeball(L)_normal
 bounds:2,225,35,34
 eyeball(R)_normal
-bounds:436,402,28,29
+bounds:721,894,28,29
 eyeball_embarrass
 bounds:472,975,76,47
 eyeball_joke
@@ -213,7 +213,7 @@ eyebrow_mystery
 bounds:868,268,78,30
 rotate:90
 eyebrow_serious
-bounds:765,474,77,30
+bounds:827,647,77,30
 rotate:90
 eyebrow_sigh
 bounds:762,140,78,30
@@ -228,13 +228,13 @@ eyebrow_worry
 bounds:555,203,79,30
 rotate:90
 eyeline(L)_normal
-bounds:608,538,43,26
+bounds:683,671,43,26
 eyeline(L)_touch1
 bounds:400,694,46,40
 eyeline(L)_touch2
 bounds:550,611,43,27
 eyeline(R)_normal
-bounds:669,643,30,29
+bounds:844,993,30,29
 eyeline(R)_touch1
 bounds:74,178,29,26
 eyeline(R)_touch2
@@ -360,7 +360,7 @@ offsets:0,10,22,76
 hairpin_1
 bounds:1252,2,51,54
 hairpin_2
-bounds:622,560,32,26
+bounds:512,368,32,26
 hairpin_3
 bounds:189,318,26,21
 hairpin_4
@@ -372,7 +372,7 @@ bounds:2,678,16,49
 hand(L)_1
 bounds:514,520,25,16
 hand(L)_10
-bounds:515,369,25,22
+bounds:346,255,25,22
 hand(L)_11
 bounds:738,915,22,20
 hand(L)_1_re
@@ -382,7 +382,7 @@ hand(L)_1_touch
 bounds:299,2,42,25
 offsets:1,0,44,25
 hand(L)_2
-bounds:718,892,32,30
+bounds:611,537,32,30
 hand(L)_2_re
 bounds:1250,228,60,56
 rotate:90
@@ -417,9 +417,9 @@ bounds:86,295,20,31
 hand(L)_7_touch
 bounds:370,766,18,19
 hand(L)_8
-bounds:336,602,17,17
+bounds:144,367,17,17
 hand(L)_8_touch
-bounds:314,580,18,17
+bounds:469,748,18,17
 hand(L)_9
 bounds:202,486,28,25
 hand(L)_9_touch
@@ -459,7 +459,7 @@ bounds:567,869,33,33
 hand2(L)_3
 bounds:1283,462,48,34
 hand2(L)_4
-bounds:836,663,28,48
+bounds:633,547,28,48
 offsets:0,1,28,49
 hand2(L)_5
 bounds:382,905,19,52
@@ -497,6 +497,8 @@ lowereyelid_trance
 bounds:2,393,78,35
 offsets:1,1,80,37
 rotate:90
+mouth_attacked(Purpleeyes)
+bounds:326,597,22,12
 mouth_embarrass
 bounds:403,733,21,15
 mouth_joke
@@ -514,8 +516,10 @@ offsets:0,0,22,15
 mouth_serious
 bounds:259,318,22,12
 offsets:1,1,24,14
+mouth_serious(Purpleeyes)
+bounds:650,841,19,11
 mouth_sigh
-bounds:146,370,17,14
+bounds:665,852,17,14
 mouth_strange
 bounds:410,411,21,13
 offsets:1,1,23,15

@@ -2,234 +2,234 @@ char001001.png
 size:2048,2048
 filter:Linear,Linear
 Eyebrow_1
-bounds:1840,2036,26,10
+bounds:1840,1579,26,10
 Eyebrow_2
-bounds:885,1942,26,11
+bounds:885,1485,26,11
 arm(L)_eff
-bounds:1486,783,174,173
+bounds:1486,326,174,173
 arm(R)_1
-bounds:812,1076,148,45
+bounds:812,619,148,45
 arm(R)_eff
-bounds:322,916,179,176
+bounds:322,459,179,176
 bangs Flower skill_1
-bounds:861,1835,17,24
+bounds:861,1378,17,24
 bangs Flower skill_2
-bounds:909,2022,22,24
+bounds:909,1565,22,24
 bangs Flower skill_3
-bounds:2016,1779,25,19
+bounds:2016,1322,25,19
 bangs Flower skill_4
-bounds:770,2025,20,21
+bounds:770,1568,20,21
 bangs Flower skill_5
-bounds:1903,988,55,49
+bounds:1903,531,55,49
 bangs Flower skill_6
-bounds:1756,1184,101,68
+bounds:1756,727,101,68
 bangs Flower_red_1
-bounds:1928,1985,20,21
+bounds:1928,1528,20,21
 bangs Flower_red_2
-bounds:1033,1704,20,21
+bounds:1033,1247,20,21
 bangs Flower_white_1
-bounds:2021,1733,22,25
+bounds:2021,1276,22,25
 bangs Flower_white_2
-bounds:1724,1711,20,23
+bounds:1724,1254,20,23
 bangs Flower_white_3_1
-bounds:1910,1570,59,52
+bounds:1910,1113,59,52
 bangs Flower_white_3_2
-bounds:1027,1669,26,21
+bounds:1027,1212,26,21
 bangs_1
-bounds:1828,1671,52,98
+bounds:1828,1214,52,98
 bangs_2
-bounds:503,928,54,100
+bounds:503,471,54,100
 bangs_3
-bounds:998,1489,55,113
+bounds:998,1032,55,113
 bangs_4
-bounds:1987,1089,59,108
+bounds:1987,632,59,108
 bangs_5
-bounds:872,1950,47,96
+bounds:872,1493,47,96
 bangs_6
-bounds:1571,1887,37,79
+bounds:1571,1430,37,79
 bangs_7
-bounds:1992,1856,50,85
+bounds:1992,1399,50,85
 bangs_8
-bounds:1666,906,52,71
+bounds:1666,449,52,71
 bangs_9
-bounds:1724,1560,38,28
+bounds:1724,1103,38,28
 bangs_skill_1
-bounds:1390,906,94,33
+bounds:1390,449,94,33
 bangs_skill_10
-bounds:596,1047,94,46
+bounds:596,590,94,46
 bangs_skill_11
-bounds:1275,1105,83,42
+bounds:1275,648,83,42
 bangs_skill_12
-bounds:1993,1034,48,81
+bounds:1993,577,48,81
 bangs_skill_2
-bounds:556,920,79,63
+bounds:556,463,79,63
 bangs_skill_3
-bounds:1571,1558,38,55
+bounds:1571,1101,38,55
 bangs_skill_5
-bounds:1436,955,93,159
+bounds:1436,498,93,159
 bangs_skill_6
-bounds:770,1633,53,115
+bounds:770,1176,53,115
 bangs_skill_7
-bounds:1706,888,47,91
+bounds:1706,431,47,91
 bangs_skill_8
-bounds:1886,1346,39,79
+bounds:1886,889,39,79
 offsets:0,0,39,80
 bangs_skill_9
-bounds:1505,966,48,79
+bounds:1505,509,48,79
 body_1
-bounds:1531,923,702,515
+bounds:1531,466,702,515
 rotate:90
 body_2
-bounds:1488,545,115,252
+bounds:1488,88,115,252
 rotate:90
 breast_5
-bounds:1724,2029,14,17
+bounds:1724,1572,14,17
 breast_6
-bounds:2016,1760,22,17
+bounds:2016,1303,22,17
 breast_L_1
-bounds:770,1750,90,122
+bounds:770,1293,90,122
 offsets:2,0,92,122
 breast_R_1
-bounds:1950,1942,85,104
+bounds:1950,1485,85,104
 breast__dress_1
-bounds:1318,839,166,75
+bounds:1318,382,166,75
 dress_9
-bounds:125,598,129,388
+bounds:125,141,129,388
 rotate:90
 dress_L_1
-bounds:1691,723,355,387
+bounds:1691,266,355,387
 dress_R_1
-bounds:1724,1609,437,290
+bounds:1724,1152,437,290
 rotate:90
 dress_back_1
-bounds:584,852,871,274
+bounds:584,395,871,274
 rotate:180
 dress_back_in_1
-bounds:1724,1645,102,78
+bounds:1724,1188,102,78
 eye skill_1
-bounds:1571,1889,18,20
+bounds:1571,1432,18,20
 eye skill_2
-bounds:770,1866,17,21
+bounds:770,1409,17,21
 eye skill_3
-bounds:1571,1710,35,35
+bounds:1571,1253,35,35
 eye skill_4
-bounds:1571,1784,35,34
+bounds:1571,1327,35,34
 eye_1
-bounds:2029,1955,17,20
+bounds:2029,1498,17,20
 eye_2
-bounds:2028,2025,17,21
+bounds:2028,1568,17,21
 eye_3
-bounds:1571,1747,35,35
+bounds:1571,1290,35,35
 eye_4
-bounds:1724,1889,35,34
+bounds:1724,1432,35,34
 face
-bounds:1724,1725,133,172
+bounds:1724,1268,133,172
 face skill_1
-bounds:1904,549,133,172
+bounds:1904,92,133,172
 face skill_2
-bounds:1769,572,133,172
+bounds:1769,115,133,172
 face_close
-bounds:770,1874,133,172
+bounds:770,1417,133,172
 face_shadow
-bounds:1874,2008,55,38
+bounds:1874,1551,55,38
 offsets:0,0,57,38
 forearm(L)_1
-bounds:1571,1645,37,28
+bounds:1571,1188,37,28
 forearm(L)_2
-bounds:852,2019,22,27
+bounds:852,1562,22,27
 forearm(L)_3
-bounds:93,822,174,50
+bounds:93,365,174,50
 forearm(L)_4
-bounds:1409,1103,92,44
+bounds:1409,646,92,44
 hair_1
-bounds:663,459,193,254
+bounds:663,2,193,254
 rotate:270
 hair_2
-bounds:489,539,270,261
+bounds:489,82,270,261
 rotate:270
 hair_3
-bounds:1255,468,343,251
+bounds:1255,11,343,251
 hair_4
-bounds:1041,713,158,79
+bounds:1041,256,158,79
 hair_5
-bounds:1021,520,129,240
+bounds:1021,63,129,240
 rotate:90
 hair_7
-bounds:927,573,255,365
+bounds:927,116,255,365
 rotate:90
 hair_8
-bounds:670,558,347,284
+bounds:670,101,347,284
 offsets:0,93,347,377
 rotate:180
 hand(L) eff_1
-bounds:910,1006,91,86
+bounds:910,549,91,86
 hand(L) eff_2
-bounds:2025,1911,21,37
+bounds:2025,1454,21,37
 hand(L)_1
-bounds:503,1007,91,86
+bounds:503,550,91,86
 hand(L)_2
-bounds:1926,2009,21,37
+bounds:1926,1552,21,37
 hand(R) eff_2
-bounds:1873,1282,44,45
+bounds:1873,825,44,45
 hand(R) eff_3
-bounds:1575,1615,34,37
+bounds:1575,1158,34,37
 hand(R) eff_4
-bounds:209,943,92,55
+bounds:209,486,92,55
 hand(R)_2
-bounds:1724,1598,44,45
+bounds:1724,1141,44,45
 hand(R)_3
-bounds:1019,1619,34,37
+bounds:1019,1162,34,37
 hand(R)_4
-bounds:888,949,92,55
+bounds:888,492,92,55
 shin_L_1
-bounds:25,567,73,332
+bounds:25,110,73,332
 rotate:90
 shin_R_1
-bounds:962,1092,91,390
+bounds:962,635,91,390
 sword1_1
-bounds:14,697,244,991
+bounds:14,240,244,991
 rotate:90
 sword1_2
-bounds:2,1000,304,1046
+bounds:2,543,304,1046
 sword2_1
-bounds:899,652,225,868
+bounds:899,195,225,868
 rotate:270
 sword2_2
-bounds:770,1121,283,925
+bounds:770,664,283,925
 sword3_1
-bounds:1399,1149,170,897
+bounds:1399,692,170,897
 sword3_2
-bounds:540,1095,228,951
+bounds:540,638,228,951
 sword4_1
-bounds:1226,1149,171,897
+bounds:1226,692,171,897
 sword4_2
-bounds:308,1094,230,952
+bounds:308,637,230,952
 sword5_1
-bounds:1611,1163,111,883
+bounds:1611,706,111,883
 sword5_2
-bounds:1055,1108,169,938
+bounds:1055,651,169,938
 thigh_L_1
-bounds:1724,1254,116,293
+bounds:1724,797,116,293
 thigh_R_1
-bounds:2,827,171,321
+bounds:2,370,171,321
 rotate:90
 upper arm(L)_1
-bounds:1571,1820,32,66
+bounds:1571,1363,32,66
 upper arm(L)_2
-bounds:1803,1627,62,38
+bounds:1803,1170,62,38
 upper arm(L)_3
-bounds:1971,1533,75,200
+bounds:1971,1076,75,200
 upper arm(L)_4
-bounds:1571,1675,38,33
+bounds:1571,1218,38,33
 upper arm(L)_5
-bounds:820,1730,37,36
+bounds:820,1273,37,36
 upper arm(R)_1
-bounds:1571,1963,35,83
+bounds:1571,1506,35,83
 upper arm(R)_2
-bounds:770,1600,50,43
+bounds:770,1143,50,43
 upper arm(R)_3
-bounds:1823,1297,66,189
+bounds:1823,840,66,189
 upper arm(R)_4
-bounds:862,1861,34,37
+bounds:862,1404,34,37
 upper arm(R)_5
-bounds:2016,1800,29,54
+bounds:2016,1343,29,54
