@@ -155,8 +155,13 @@ type CompositeSegment = {
   source: string | null
   skin?: string
   hold?: boolean
+  loop?: boolean
   holdUntil?: number
 }
+type CompiledComposite =
+  | { kind: 'animation'; spec: CutsceneAnim }
+  | { kind: 'sequence'; children: CompiledComposite[] }
+  | { kind: 'parallel'; children: CompiledComposite[] }
 type ResolvedCutsceneComposite = { name: string; mapping: CutsceneComposite }
 type CompositeOverlayInstance = {
   trackIndex: number
@@ -302,12 +307,13 @@ let offset = new Vector2()
 let size = new Vector2()
 
 const DEFAULT_COMPOSITE_NAME = 'all'
+const resolvedCompositeCache = new WeakMap<CutsceneComposite, CompiledComposite>()
 let compositeActive = false
 let compositeDuration = 0
 let compositeElapsed = 0
 let compositeLastTimestamp: number | null = null
 let compositeSchedule: CompositeSegment[] = []
-let compositeMapping: CutsceneComposite | null = null
+let compositeMapping: CompiledComposite | null = null
 let compositeCharId: string | null = null
 let compositeRestarting = false
 let compositeStartToken = 0
@@ -517,9 +523,61 @@ function getCompositesForCurrent(): ResolvedCutsceneComposite[] {
   return normalizeCompositeDefinitions(cutsceneComposites[store.selectedCharacterId])
 }
 
-function getCompositeForAnimation(animationName: string | null | undefined): CutsceneComposite | null {
+function compileCompositeSpec(
+  spec: CutsceneAnim,
+  definitions: Map<string, ResolvedCutsceneComposite>,
+  ancestors: string[],
+): CompiledComposite {
+  const nested = typeof spec === 'string' ? definitions.get(spec) : undefined
+  return nested
+    ? compileComposite(nested, definitions, ancestors)
+    : { kind: 'animation', spec }
+}
+
+function compileComposite(
+  definition: ResolvedCutsceneComposite,
+  definitions: Map<string, ResolvedCutsceneComposite>,
+  ancestors: string[] = [],
+): CompiledComposite {
+  const cached = resolvedCompositeCache.get(definition.mapping)
+  if (cached) return cached
+  if (ancestors.includes(definition.name)) {
+    throw new Error(`Circular composite reference: ${[...ancestors, definition.name].join(' -> ')}`)
+  }
+
+  const nextAncestors = [...ancestors, definition.name]
+  const compiled: CompiledComposite = {
+    kind: 'sequence',
+    children: definition.mapping.map(phase =>
+      Array.isArray(phase)
+        ? {
+            kind: 'parallel',
+            children: phase.map(spec => compileCompositeSpec(spec, definitions, nextAncestors)),
+          }
+        : compileCompositeSpec(phase, definitions, nextAncestors),
+    ),
+  }
+
+  resolvedCompositeCache.set(definition.mapping, compiled)
+  return compiled
+}
+
+function getCompositeForAnimation(animationName: string | null | undefined): CompiledComposite | null {
   if (!animationName) return null
-  return getCompositesForCurrent().find(definition => definition.name === animationName)?.mapping ?? null
+  const definitions = getCompositesForCurrent()
+  const selected = definitions.find(definition => definition.name === animationName)
+  if (!selected) return null
+  const definitionsByName = new Map<string, ResolvedCutsceneComposite>()
+  definitions.forEach(definition => {
+    if (!definitionsByName.has(definition.name)) definitionsByName.set(definition.name, definition)
+  })
+  return compileComposite(selected, definitionsByName)
+}
+
+function compositeHasParallel(mapping: CompiledComposite): boolean {
+  return mapping.kind === 'parallel' || (
+    mapping.kind === 'sequence' && mapping.children.some(compositeHasParallel)
+  )
 }
 
 function getAnimDuration(state: AnimationState | null | undefined, name: string) {
@@ -556,6 +614,26 @@ function getAnimSpecSkin(spec: CutsceneAnim) {
 
 function getAnimSpecHold(spec: CutsceneAnim) {
   return typeof spec === 'string' ? false : spec.hold === true
+}
+
+function getAnimSpecLoop(spec: CutsceneAnim) {
+  return typeof spec === 'string' ? false : spec.loop === true
+}
+
+function getAnimSpecPlayDuration(spec: CutsceneAnim, nativeDuration: number) {
+  if (typeof spec === 'string') return nativeDuration
+  const requestedDuration = spec.playDuration
+  if (typeof requestedDuration !== 'number' || !Number.isFinite(requestedDuration) || requestedDuration <= 0) {
+    return nativeDuration
+  }
+  return Math.min(requestedDuration, nativeDuration)
+}
+
+function getAnimSpecLayerOrder(spec: CutsceneAnim) {
+  if (typeof spec === 'string') return 0
+  return typeof spec.layerOrder === 'number' && Number.isFinite(spec.layerOrder)
+    ? spec.layerOrder
+    : 0
 }
 
 function getSpineAssetRoot() {
@@ -608,15 +686,17 @@ function resolveExternalSkeletonBasePath(source: string) {
   return `${getSpineAssetRoot()}/${store.selectedCharacterId}/${source}`
 }
 
-function collectCompositeSources(mapping: CutsceneComposite) {
+function collectCompositeSources(mapping: CompiledComposite) {
   const sources = new Set<string>()
-  mapping.forEach(segment => {
-    const specs = Array.isArray(segment) ? segment : [segment]
-    specs.forEach(spec => {
-      const source = getAnimSpecSource(spec)
+  const collect = (node: CompiledComposite) => {
+    if (node.kind === 'animation') {
+      const source = getAnimSpecSource(node.spec)
       if (source) sources.add(source)
-    })
-  })
+      return
+    }
+    node.children.forEach(collect)
+  }
+  collect(mapping)
   return sources
 }
 
@@ -647,7 +727,7 @@ async function getExternalSkeletonAsset(source: string): Promise<ExternalSkeleto
   return assetPromise
 }
 
-async function loadCompositeExternalAssets(mapping: CutsceneComposite) {
+async function loadCompositeExternalAssets(mapping: CompiledComposite) {
   const assets = new Map<string, ExternalSkeletonAsset>()
   await Promise.all(
     Array.from(collectCompositeSources(mapping)).map(async source => {
@@ -667,47 +747,85 @@ function getCompositeSegmentDuration(
   return getSkeletonAnimDuration(externalAssets.get(source)?.skeletonData, name)
 }
 
-function buildCompositeSchedule(
-  mapping: CutsceneComposite,
+function buildCompositeScheduleNode(
+  node: CompiledComposite,
   state: AnimationState | null | undefined,
-  externalAssets = new Map<string, ExternalSkeletonAsset>(),
-) {
-  const schedule: CompositeSegment[] = []
-  let phaseStart = 0
-
-  for (const segment of mapping) {
-    if (Array.isArray(segment)) {
-      let longest = 0
-      const phaseSegments = segment.map((animSpec, index) => {
-        const name = getAnimSpecName(animSpec)
-        const offsetValue = getAnimSpecOffset(animSpec)
-        const source = getAnimSpecSource(animSpec)
-        const skin = getAnimSpecSkin(animSpec)
-        const hold = getAnimSpecHold(animSpec)
-        const duration = getCompositeSegmentDuration(state, externalAssets, name, source)
-        const start = phaseStart + offsetValue
-        if (duration + offsetValue > longest) longest = duration + offsetValue
-        return { track: index, start, duration, name, additive: true, source, skin, hold }
-      })
-      const phaseEnd = phaseStart + longest
-      phaseSegments.forEach(segment => {
-        schedule.push(segment.hold ? { ...segment, holdUntil: phaseEnd } : segment)
-      })
-      phaseStart += longest
-    } else {
-      const name = getAnimSpecName(segment)
-      const offsetValue = getAnimSpecOffset(segment)
-      const source = getAnimSpecSource(segment)
-      const skin = getAnimSpecSkin(segment)
-      const hold = getAnimSpecHold(segment)
-      const duration = getCompositeSegmentDuration(state, externalAssets, name, source)
-      const start = phaseStart + offsetValue
-      schedule.push({ track: 0, start, duration, name, additive: false, source, skin, hold })
-      phaseStart += Math.max(duration + offsetValue, 0)
+  externalAssets: Map<string, ExternalSkeletonAsset>,
+  start: number,
+  track: number,
+  insideParallel = false,
+): { schedule: CompositeSegment[]; duration: number; trackCount: number } {
+  if (node.kind === 'animation') {
+    const name = getAnimSpecName(node.spec)
+    const offsetValue = getAnimSpecOffset(node.spec)
+    const source = getAnimSpecSource(node.spec)
+    const skin = getAnimSpecSkin(node.spec)
+    const hold = getAnimSpecHold(node.spec)
+    const loop = getAnimSpecLoop(node.spec)
+    const nativeDuration = getCompositeSegmentDuration(state, externalAssets, name, source)
+    const duration = getAnimSpecPlayDuration(node.spec, nativeDuration)
+    return {
+      schedule: [{ track, start: start + offsetValue, duration, name, additive: insideParallel, source, skin, hold, loop }],
+      duration: Math.max(duration + offsetValue, 0),
+      trackCount: 1,
     }
   }
 
-  const duration = schedule.reduce((max, seg) => Math.max(max, seg.start + seg.duration), 0)
+  if (node.kind === 'sequence') {
+    const schedule: CompositeSegment[] = []
+    let elapsed = 0
+    let trackCount = 1
+    node.children.forEach(child => {
+      const result = buildCompositeScheduleNode(
+        child,
+        state,
+        externalAssets,
+        start + elapsed,
+        track,
+        insideParallel,
+      )
+      schedule.push(...result.schedule)
+      elapsed += result.duration
+      trackCount = Math.max(trackCount, result.trackCount)
+    })
+    return { schedule, duration: elapsed, trackCount }
+  }
+
+  const orderedChildren = node.children
+    .map((child, index) => ({ child, index }))
+    .sort((a, b) => {
+      const aOrder = a.child.kind === 'animation' ? getAnimSpecLayerOrder(a.child.spec) : 0
+      const bOrder = b.child.kind === 'animation' ? getAnimSpecLayerOrder(b.child.spec) : 0
+      return aOrder - bOrder || a.index - b.index
+    })
+  const branches: Array<{ node: CompiledComposite; result: ReturnType<typeof buildCompositeScheduleNode> }> = []
+  let nextTrack = track
+  let duration = 0
+  orderedChildren.forEach(({ child }) => {
+    const result = buildCompositeScheduleNode(child, state, externalAssets, start, nextTrack, true)
+    branches.push({ node: child, result })
+    duration = Math.max(duration, result.duration)
+    nextTrack += Math.max(result.trackCount, 1)
+  })
+  const phaseEnd = start + duration
+  const schedule = branches.flatMap(branch => {
+    if (
+      branch.node.kind !== 'animation' ||
+      (!getAnimSpecHold(branch.node.spec) && !getAnimSpecLoop(branch.node.spec))
+    ) {
+      return branch.result.schedule
+    }
+    return branch.result.schedule.map(segment => ({ ...segment, holdUntil: phaseEnd }))
+  })
+  return { schedule, duration, trackCount: Math.max(nextTrack - track, 1) }
+}
+
+function buildCompositeSchedule(
+  mapping: CompiledComposite,
+  state: AnimationState | null | undefined,
+  externalAssets = new Map<string, ExternalSkeletonAsset>(),
+) {
+  const { schedule, duration } = buildCompositeScheduleNode(mapping, state, externalAssets, 0, 0)
   return { schedule, duration }
 }
 
@@ -717,7 +835,7 @@ function getCompositeSegmentEnd(segment: CompositeSegment, includeHold = true) {
     : segment.start + segment.duration
 }
 
-async function scheduleCompositeTimeline(p: SpinePlayer, mapping: CutsceneComposite, seekToSeconds = 0) {
+async function scheduleCompositeTimeline(p: SpinePlayer, mapping: CompiledComposite, seekToSeconds = 0) {
   const state = p.animationState
   const skeleton = p.skeleton
   if (!state || !skeleton) return { schedule: [], duration: 0, time: 0, externalAssets: new Map<string, ExternalSkeletonAsset>() }
@@ -756,26 +874,29 @@ function applySegmentsToState(
   if (hideWhenOutOfRange && time < current.start - EPS) {
     return
   }
-  const currentTime = Math.max(0, Math.min(current.duration, time - current.start))
-  const entry = state.setAnimation(0, current.name, false)
+  const elapsed = Math.max(0, time - current.start)
+  const currentTime = current.loop ? elapsed : Math.min(current.duration, elapsed)
+  const entry = state.setAnimation(0, current.name, current.loop)
   if (entry) {
     entry.mixDuration = 0
     entry.mixTime = 0
+    entry.animationEnd = current.duration
     entry.trackTime = currentTime
     entry.trackLast = currentTime
     entry.nextTrackLast = currentTime
   }
 
-  let prevEnd = getCompositeSegmentEnd(current)
+  let previous = current
   for (let i = currentIndex + 1; i < segments.length; i++) {
     const segment = segments[i]
-    const delay = Math.max(0, segment.start - prevEnd)
-    const nextEntry = state.addAnimation(0, segment.name, false, delay)
+    const delay = Math.max(Number.EPSILON, segment.start - previous.start)
+    const nextEntry = state.addAnimation(0, segment.name, segment.loop, delay)
     if (nextEntry) {
       nextEntry.mixDuration = 0
       nextEntry.mixTime = 0
+      nextEntry.animationEnd = segment.duration
     }
-    prevEnd = getCompositeSegmentEnd(segment)
+    previous = segment
   }
 
   state.apply(skeleton)
@@ -836,6 +957,9 @@ function compositeTracksActive(p: SpinePlayer | null): boolean {
 }
 
 function compositeTracksFinished(p: SpinePlayer | null): boolean {
+  if (compositeDuration > 0 && compositeSchedule.length > 0) {
+    return compositeElapsed >= compositeDuration - 1e-3
+  }
   if (compositeSchedule.some(segment => segment.source)) {
     return compositeDuration > 0 && compositeElapsed >= compositeDuration - 1e-3
   }
@@ -853,6 +977,9 @@ function compositeTracksFinished(p: SpinePlayer | null): boolean {
 }
 
 function compositeTracksReachedAnimEnd(p: SpinePlayer | null): boolean {
+  if (compositeDuration > 0 && compositeSchedule.length > 0) {
+    return compositeElapsed >= compositeDuration - 1e-3
+  }
   if (compositeSchedule.some(segment => segment.source)) {
     return compositeDuration > 0 && compositeElapsed >= compositeDuration - 1e-3
   }
@@ -902,11 +1029,12 @@ function currentCompositeTime(p: SpinePlayer | null) {
         !item.source &&
         item.track === trackIndex &&
         item.name === track.animation?.name &&
-        (track.trackTime ?? 0) <= item.duration + 0.01,
+        (track.trackTime ?? 0) <= getCompositeSegmentEnd(item) - item.start + 0.01,
     )
     if (!segment) return
     hasTracks = true
-    const trackTime = Math.max(0, Math.min(segment.duration, track.trackTime ?? 0))
+    const scheduledDuration = getCompositeSegmentEnd(segment) - segment.start
+    const trackTime = Math.max(0, Math.min(scheduledDuration, track.trackTime ?? 0))
     maxTime = Math.max(maxTime, segment.start + trackTime)
   })
   return { time: hasTracks ? maxTime : compositeElapsed, hasTracks }
@@ -1034,7 +1162,7 @@ function renderCompositeOnce() {
   drawOverlay()
 }
 
-async function startComposite(p: SpinePlayer, mapping: CutsceneComposite, seekToSeconds = 0) {
+async function startComposite(p: SpinePlayer, mapping: CompiledComposite, seekToSeconds = 0) {
   const state = p.animationState
   const skeleton = p.skeleton
   if (!state || !skeleton) return
@@ -2300,7 +2428,7 @@ function saveScreenshot(transparent: boolean) {
   const gl = (player as unknown as SpinePlayerInternal).context.gl
   const maxTexSize = gl.getParameter(gl.MAX_TEXTURE_SIZE)
   const mapping = getCompositeForAnimation(animationName)
-  const hasOverlap = !!mapping && mapping.some(segment => Array.isArray(segment))
+  const hasOverlap = !!mapping && compositeHasParallel(mapping)
 
   let targetWidth: number
   let targetHeight: number
@@ -2396,7 +2524,7 @@ async function exportAnimation(transparent: boolean): Promise<void> {
   const state = p.animationState
   const skeleton = p.skeleton
   const animName = store.selectedAnimation
-  let mapping: CutsceneComposite | null = null
+  let mapping: CompiledComposite | null = null
   let stream: MediaStream | null = null
   let activeRecorder: MediaRecorder | null = null
 
@@ -2442,7 +2570,7 @@ async function exportAnimation(transparent: boolean): Promise<void> {
       if (mapping) {
         const info = await scheduleCompositeTimeline(p, mapping, 0)
         duration = info.duration
-        timelineEnd = info.schedule.reduce((max, seg) => Math.max(max, seg.start + seg.duration), 0) || duration || 3
+        timelineEnd = info.duration || duration || 3
         store.playing = true
         await startComposite(p, mapping, 0)
       } else {
@@ -2598,7 +2726,7 @@ function exportAnimationFrames(transparent: boolean): Promise<void> {
     const state = p.animationState
     const skeleton = p.skeleton
     let timelineEnd = duration
-    let mapping: CutsceneComposite | null = null
+    let mapping: CompiledComposite | null = null
     if (animName && state) {
       mapping = getCompositeForAnimation(animName)
       if (mapping) {
