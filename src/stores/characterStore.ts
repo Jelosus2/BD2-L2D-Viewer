@@ -9,6 +9,7 @@ export interface Character {
   spine: string
   cutscene: string
   dating: string
+  audio: string
   icon: string,
   datingUsesTracks?: boolean,
   customFiles?: {

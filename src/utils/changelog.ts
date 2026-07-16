@@ -1,5 +1,16 @@
 export default [
   {
+    "date": "16/07/2026",
+    "changes": [
+      "Added voices for the characters in JP and KR and a setting to change the language.",
+      "Fix exporting animations as webm in browsers like Firefox and others.",
+      "Added a tutorial for the new feature.",
+      "Added complete ultimate animations (cut_all animations).",
+      "Added Dalvi: Tricky Lover ultimate animations.",
+      "Added Dalvi: Tricky Lover character icon."
+    ]
+  },
+  {
     "date": "09/07/2026",
     "changes": [
       "Added all the NPC character standing animations (finally).",

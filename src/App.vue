@@ -3,9 +3,13 @@
     <Navbar
       v-show="!inspectMode"
       :has-custom-background="hasCustomBackground"
+      :tutorial-active="tutorialActive"
       @mobile-menu="onNavMobileMenu"
       @upload-bg="onCustomBgUpload"
       @overlay-active="onNavbarOverlayActive"
+      @settings-open="onSettingsOpen"
+      @settings-close="onSettingsClose"
+      @settings-language-change="completeInteractionTutorial"
     />
     <div class="flex flex-1 flex-col lg:flex-row h-full min-h-0 overflow-hidden">
       <div class="order-1 lg:order-none hidden lg:flex flex-col min-h-0">
@@ -89,8 +93,9 @@
           :mobile-overlay-active="overlayActive"
           :inspect-mode="inspectMode"
           @update:inspect-mode="onInspectModeChange"
-          @animations="animations = $event"
+          @animations="onAnimationsLoaded"
           @skins="skins = $event"
+          @character-interaction="onTutorialCharacterInteraction"
         />
         <div
           v-if="showLayerSelectionHint"
@@ -138,6 +143,17 @@
         </div>
       </div>
     </div>
+    <FeatureTutorial
+      v-if="tutorialContent"
+      :key="tutorialStep"
+      :target="tutorialContent.target"
+      :title="tutorialContent.title"
+      :message="tutorialContent.message"
+      :step-label="tutorialContent.stepLabel"
+      :can-complete="tutorialContent.canComplete"
+      @skip="completeInteractionTutorial"
+      @complete="completeInteractionTutorial"
+    />
   </div>
 </template>
 
@@ -146,8 +162,10 @@ import Navbar from '@/components/Navbar.vue'
 import CharacterSidebar from '@/components/CharacterSideBar.vue'
 import AnimationSidebar from '@/components/AnimationSideBar.vue'
 import SpineViewer from '@/components/SpineViewer.vue'
-import { ref, watchEffect, computed, watch, onBeforeUnmount } from 'vue'
+import FeatureTutorial from '@/components/FeatureTutorial.vue'
+import { ref, watchEffect, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { useCharacterStore } from '@/stores/characterStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { buildUrl } from './utils/urlSync'
 
 import CameraResetIcon from '@/components/icons/CameraResetIcon.vue';
@@ -160,6 +178,24 @@ import MinusIcon from '@/components/icons/MinusIcon.vue';
 import PlusIcon from '@/components/icons/PlusIcon.vue';
 
 const store = useCharacterStore()
+const settingsStore = useSettingsStore()
+
+type TutorialStep =
+  | 'inactive'
+  | 'loading'
+  | 'character'
+  | 'settings'
+  | 'mobile-menu'
+  | 'mobile-settings'
+  | 'language'
+
+type TutorialContent = {
+  target: string | null
+  title: string
+  message: string
+  stepLabel?: string
+  canComplete?: boolean
+}
 
 const animations = ref<string[]>([])
 const skins = ref<string[]>([])
@@ -171,11 +207,176 @@ const navMobileMenuOpen = ref(false)
 const navbarOverlayActive = ref(false)
 const showLayerSelectionHint = ref(false)
 const inspectMode = ref(false)
+const tutorialStep = ref<TutorialStep>(settingsStore.interactionTutorialCompleted ? 'inactive' : 'loading')
+const tutorialCharacterId = ref<string | null>(null)
+const mobileNavbarLayout = ref(false)
 const overlayActive = computed(
   () => showMobileControls.value || navMobileMenuOpen.value || navbarOverlayActive.value,
 )
 const hasCustomBackground = computed(() => !!store.customBackgroundImage)
+const tutorialActive = computed(() => tutorialStep.value !== 'inactive')
+const tutorialContent = computed<TutorialContent | null>(() => {
+  switch (tutorialStep.value) {
+    case 'loading':
+      return {
+        target: null,
+        title: 'Preparing an interactive character',
+        message: 'Finding a playable character with the idle and motion animations...',
+      }
+    case 'character':
+      return {
+        target: '[data-tutorial="character-viewer"]',
+        title: 'Characters are interactive',
+        message: 'Click directly on the character to play their motion animation and voice line.',
+        stepLabel: 'Step 1 of 3',
+      }
+    case 'settings':
+      return {
+        target: '[data-tutorial="settings-button"]',
+        title: 'Voice settings',
+        message: 'Open Settings with the gear button to choose the voice language.',
+        stepLabel: 'Step 2 of 3',
+      }
+    case 'mobile-menu':
+      return {
+        target: '[data-tutorial="mobile-menu-button"]',
+        title: 'Voice settings',
+        message: 'Open the navigation menu to find the voice settings.',
+        stepLabel: 'Step 2 of 3',
+      }
+    case 'mobile-settings':
+      return {
+        target: '[data-tutorial="mobile-settings-button"]',
+        title: 'Open Settings',
+        message: 'Tap Settings to choose between Japanese and Korean voices.',
+        stepLabel: 'Step 2 of 3',
+      }
+    case 'language':
+      return {
+        target: '[data-tutorial="audio-language"]',
+        title: 'Choose a voice language',
+        message: 'Select JP or KR. Your preference is saved in this browser and used for future voice lines.',
+        stepLabel: 'Step 3 of 3',
+        canComplete: true,
+      }
+    default:
+      return null
+  }
+})
 let layerSelectionHintTimeout: number | null = null
+let tutorialCandidateIds: string[] = []
+let tutorialCandidateIndex = 0
+let tutorialRetryTimeout: number | null = null
+let mobileNavbarMediaQuery: MediaQueryList | null = null
+
+function shuffle<T>(items: T[]) {
+  const shuffled = [...items]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
+function clearTutorialRetryTimeout() {
+  if (tutorialRetryTimeout === null) return
+  window.clearTimeout(tutorialRetryTimeout)
+  tutorialRetryTimeout = null
+}
+
+function completeInteractionTutorial() {
+  clearTutorialRetryTimeout()
+  settingsStore.completeInteractionTutorial()
+  tutorialStep.value = 'inactive'
+  tutorialCharacterId.value = null
+}
+
+function loadNextTutorialCandidate() {
+  clearTutorialRetryTimeout()
+  const characterId = tutorialCandidateIds[tutorialCandidateIndex++]
+  if (!characterId) {
+    completeInteractionTutorial()
+    return
+  }
+
+  tutorialCharacterId.value = characterId
+  tutorialStep.value = 'loading'
+  store.animationCategory = 'character'
+  store.selectedAnimation = ''
+  store.selectedSkin = ''
+  store.playing = true
+  animations.value = []
+  skins.value = []
+  showMobileControls.value = false
+  if (store.selectedCharacterId !== characterId) {
+    store.selectedCharacterId = characterId
+  }
+  tutorialRetryTimeout = window.setTimeout(loadNextTutorialCandidate, 20000)
+}
+
+function initializeInteractionTutorial() {
+  if (settingsStore.interactionTutorialCompleted) return
+
+  tutorialCandidateIds = shuffle(
+    store.characters
+      .filter(character =>
+        !character.customFiles &&
+        !!character.audio &&
+        !character.charName.toLowerCase().includes('(npc)'),
+      )
+      .map(character => character.id),
+  )
+  if (tutorialCandidateIds.length > 1 && tutorialCandidateIds[0] === store.selectedCharacterId) {
+    ;[tutorialCandidateIds[0], tutorialCandidateIds[1]] = [tutorialCandidateIds[1], tutorialCandidateIds[0]]
+  }
+  tutorialCandidateIndex = 0
+  loadNextTutorialCandidate()
+}
+
+function onAnimationsLoaded(names: string[]) {
+  animations.value = names
+  if (
+    tutorialStep.value !== 'loading' ||
+    !tutorialCharacterId.value ||
+    tutorialCharacterId.value !== store.selectedCharacterId
+  ) {
+    return
+  }
+
+  clearTutorialRetryTimeout()
+
+  if (names.includes('idle') && names.includes('motion')) {
+    store.selectedAnimation = 'idle'
+    store.playing = true
+    tutorialStep.value = 'character'
+    return
+  }
+
+  tutorialRetryTimeout = window.setTimeout(loadNextTutorialCandidate, 0)
+}
+
+function onTutorialCharacterInteraction() {
+  if (tutorialStep.value !== 'character') return
+  tutorialStep.value = mobileNavbarLayout.value ? 'mobile-menu' : 'settings'
+}
+
+function onSettingsOpen() {
+  if (
+    tutorialStep.value === 'settings' ||
+    tutorialStep.value === 'mobile-menu' ||
+    tutorialStep.value === 'mobile-settings'
+  ) {
+    tutorialStep.value = 'language'
+  }
+}
+
+function onSettingsClose() {
+  if (tutorialStep.value === 'language') completeInteractionTutorial()
+}
+
+function updateMobileNavbarLayout(event?: MediaQueryListEvent) {
+  mobileNavbarLayout.value = event?.matches ?? mobileNavbarMediaQuery?.matches ?? false
+}
 
 function onSelectCharacter(id: string) {
   if (id === store.selectedCharacterId) return
@@ -236,6 +437,11 @@ function onCategoryChange() {
 
 function onNavMobileMenu(open: boolean) {
   navMobileMenuOpen.value = open
+  if (tutorialStep.value === 'mobile-menu' && open) {
+    tutorialStep.value = 'mobile-settings'
+  } else if (tutorialStep.value === 'mobile-settings' && !open) {
+    tutorialStep.value = 'mobile-menu'
+  }
 }
 
 function onCustomBgUpload(image: string | null) {
@@ -284,8 +490,28 @@ watch(
   },
 )
 
+watch(mobileNavbarLayout, mobile => {
+  if (tutorialStep.value === 'settings' || tutorialStep.value === 'mobile-menu' || tutorialStep.value === 'mobile-settings') {
+    tutorialStep.value = mobile
+      ? navMobileMenuOpen.value
+        ? 'mobile-settings'
+        : 'mobile-menu'
+      : 'settings'
+  }
+})
+
+onMounted(() => {
+  mobileNavbarMediaQuery = window.matchMedia('(max-width: 767px)')
+  updateMobileNavbarLayout()
+  mobileNavbarMediaQuery.addEventListener('change', updateMobileNavbarLayout)
+  initializeInteractionTutorial()
+})
+
 onBeforeUnmount(() => {
   clearLayerSelectionHintTimeout()
+  clearTutorialRetryTimeout()
+  mobileNavbarMediaQuery?.removeEventListener('change', updateMobileNavbarLayout)
+  mobileNavbarMediaQuery = null
 })
 
 watchEffect(() => {

@@ -122,6 +122,7 @@ function process() {
         spine: '',
         cutscene: '',
         dating: '',
+        audio: '',
         icon: '',
         customFiles,
       }

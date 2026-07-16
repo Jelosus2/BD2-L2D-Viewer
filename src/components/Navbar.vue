@@ -51,6 +51,16 @@
         >
           <PatreonIcon class="w-5 h-5 md:w-7 md:h-7" />
         </a>
+        <button
+          type="button"
+          data-tutorial="settings-button"
+          class="cursor-pointer"
+          title="Settings"
+          aria-label="Open settings"
+          @click="openSettings(false)"
+        >
+          <SettingsIcon class="w-5 h-5 md:w-7 md:h-7" />
+        </button>
         <button class="cursor-pointer" @click="showChangelog = true" title="Changelog">
           <ChangelogIcon class="w-5 h-5 md:w-7 md:h-7" />
         </button>
@@ -59,6 +69,7 @@
         </a>
       </div>
       <button
+        data-tutorial="mobile-menu-button"
         class="md:hidden cursor-pointer"
         @click="openMobileMenu()"
         aria-label="Menu"
@@ -104,6 +115,14 @@
         >
           <BgResetIcon class="w-5 h-5 opacity-60" />
           <span>Reset Background</span>
+        </button>
+        <button
+          data-tutorial="mobile-settings-button"
+          class="flex items-center gap-2"
+          @click="openSettings(true)"
+        >
+          <SettingsIcon class="w-5 h-5" />
+          <span>Settings</span>
         </button>
         <button
           class="flex items-center gap-2"
@@ -155,6 +174,11 @@
 
     <UploadSpineModal v-if="showUploadModal" @close="showUploadModal = false" />
     <ChangelogModal v-if="showChangelog" @close="showChangelog = false" />
+    <SettingsModal
+      v-if="showSettings"
+      @close="closeSettings"
+      @language-change="emit('settings-language-change')"
+    />
     <UploadBackgroundModal
       v-if="showBackgroundModal"
       :show-reset="hasCustomBackground"
@@ -168,6 +192,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import ChangelogModal from '@/components/ChangelogModal.vue'
+import SettingsModal from '@/components/SettingsModal.vue'
 import UploadSpineModal from '@/components/UploadSpineModal.vue'
 import UploadBackgroundModal from '@/components/UploadBackgroundModal.vue'
 
@@ -179,13 +204,16 @@ import KoFiIcon from '@/components/icons/KoFiIcon.vue'
 import PatreonIcon from '@/components/icons/PatreonIcon.vue'
 import BgUploadIcon from '@/components/icons/BgUploadIcon.vue'
 import BgResetIcon from '@/components/icons/BgResetIcon.vue'
+import SettingsIcon from '@/components/icons/SettingsIcon.vue'
 
-const props = defineProps<{ hasCustomBackground?: boolean }>()
+const props = defineProps<{ hasCustomBackground?: boolean; tutorialActive?: boolean }>()
 const hasCustomBackground = computed(() => !!props.hasCustomBackground)
+const tutorialActive = computed(() => !!props.tutorialActive)
 
 const showChangelog = ref(false)
 const showUploadModal = ref(false)
 const showBackgroundModal = ref(false)
+const showSettings = ref(false)
 const showKofiTooltip = ref(false)
 const kofiTooltipHidden = ref(false)
 const mobileMenuOpen = ref(false)
@@ -201,12 +229,15 @@ const emit = defineEmits<{
   (e: 'mobile-menu', open: boolean): void
   (e: 'upload-bg', dataUrl: string | null): void
   (e: 'overlay-active', active: boolean): void
+  (e: 'settings-open'): void
+  (e: 'settings-close'): void
+  (e: 'settings-language-change'): void
 }>()
 
 const openMobileMenu = () => {
   mobileMenuOpen.value = true
   emit('mobile-menu', true)
-  if (!localStorage.getItem('kofiPromptSeen') && !mobileTipTimer) {
+  if (!tutorialActive.value && !localStorage.getItem('kofiPromptSeen') && !mobileTipTimer) {
     showMobileKofiTip.value = true
     mobileTipTimer = window.setTimeout(() => {
       mobileKofiTipHidden.value = true
@@ -241,6 +272,19 @@ const openBackgroundModal = (fromMobile: boolean) => {
   showBackgroundModal.value = true
 }
 
+const openSettings = (fromMobile: boolean) => {
+  if (fromMobile && mobileMenuOpen.value) {
+    closeMobileMenu()
+  }
+  showSettings.value = true
+  emit('settings-open')
+}
+
+const closeSettings = () => {
+  showSettings.value = false
+  emit('settings-close')
+}
+
 const resetBackground = () => {
   closeMenuAfterBgUpload = false
   emit('upload-bg', null)
@@ -268,16 +312,20 @@ const handleBackgroundReset = () => {
 }
 
 watch(
-  [showChangelog, showUploadModal, showBackgroundModal],
+  [showChangelog, showUploadModal, showBackgroundModal, showSettings],
   () => {
-    const active = showChangelog.value || showUploadModal.value || showBackgroundModal.value
+    const active = showChangelog.value || showUploadModal.value || showBackgroundModal.value || showSettings.value
     emit('overlay-active', active)
   },
   { immediate: true },
 )
 
 onMounted(() => {
-  if (!localStorage.getItem('kofiPromptSeen') && !window.matchMedia('(max-width: 767px)').matches) {
+  if (
+    !tutorialActive.value &&
+    !localStorage.getItem('kofiPromptSeen') &&
+    !window.matchMedia('(max-width: 767px)').matches
+  ) {
     showKofiTooltip.value = true
     setTimeout(() => {
       kofiTooltipHidden.value = true
@@ -289,9 +337,3 @@ onMounted(() => {
   }
 })
 </script>
-
-
-
-
-
-

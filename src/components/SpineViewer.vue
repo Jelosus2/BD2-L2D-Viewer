@@ -1,5 +1,5 @@
 <template>
-  <div class="relative w-full h-full">
+  <div class="relative w-full h-full" data-tutorial="character-viewer">
     <div
       ref="toolbarRef"
       class="absolute left-2 flex flex-col gap-2 pointer-events-auto transition-opacity duration-150"
@@ -111,6 +111,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted, onBeforeUnmount, computed, type CSSProperties } from 'vue'
 import { useCharacterStore } from '@/stores/characterStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import {
   SpinePlayer,
   Vector2,
@@ -124,6 +125,8 @@ import {
   Skeleton,
   SkeletonBinary,
   TrackEntry,
+  MeshAttachment,
+  RegionAttachment,
   type VertexAttachment,
   type SkeletonData,
   type Skeleton as SpineSkeleton,
@@ -184,6 +187,20 @@ type SpineSlot = {
   attachment?: unknown
 }
 
+type CharacterClickCandidate = {
+  pointerId: number
+  startX: number
+  startY: number
+  moved: boolean
+  player: SpinePlayer
+  characterId: string
+}
+
+type CharacterAudioPool = {
+  key: string
+  clips: HTMLAudioElement[]
+}
+
 const container = ref<HTMLDivElement | null>(null)
 const viewerWrapper = ref<HTMLDivElement | null>(null)
 const toolbarRef = ref<HTMLDivElement | null>(null)
@@ -194,6 +211,7 @@ const overlayCanvas = ref<HTMLCanvasElement | null>(null)
 
 const progress = ref(0)
 const store = useCharacterStore()
+const settingsStore = useSettingsStore()
 
 const props = defineProps<{ mobileOverlayActive?: boolean; inspectMode?: boolean }>()
 const showingMobileOverlay = computed(() => props.mobileOverlayActive ?? false)
@@ -231,6 +249,13 @@ let activePointerMoveListener: ((event: PointerEvent) => void) | null = null
 const pointerStart = { x: 0, y: 0 }
 const initialRect = { x: 0, y: 0, width: 0, height: 0 }
 const MIN_BACKGROUND_SIZE = 60
+const CHARACTER_CLICK_DRAG_THRESHOLD = 6
+const CHARACTER_IDLE_ANIMATION = 'idle'
+const CHARACTER_MOTION_ANIMATION = 'motion'
+let characterClickCandidate: CharacterClickCandidate | null = null
+let characterAudioPool: CharacterAudioPool | null = null
+let activeCharacterAudio: HTMLAudioElement | null = null
+let nextCharacterAudioIndex = 0
 
 const backgroundReady = computed(() => backgroundImage.initialized && backgroundImage.width > 0 && backgroundImage.height > 0)
 const hasBackgroundImage = computed(() => backgroundReady.value)
@@ -640,6 +665,10 @@ function getSpineAssetRoot() {
   return import.meta.env.DEV
     ? 'src/assets/spines'
     : import.meta.env.VITE_SPINE_ASSET_ROOT || 'assets/spines'
+}
+
+function getAudioAssetRoot() {
+  return import.meta.env.DEV ? 'src/assets/audios' : 'assets/audios'
 }
 
 function getScopedLayerName(source: string | null, slotName: string) {
@@ -1699,7 +1728,7 @@ function getCompositeDataURL(canvasElement: HTMLCanvasElement, transparent: bool
   return offscreen.toDataURL('image/png')
 }
 
-const emit = defineEmits(['animations', 'skins', 'update:inspectMode'])
+const emit = defineEmits(['animations', 'skins', 'update:inspectMode', 'character-interaction'])
 
 function requestViewerRedraw() {
   requestAnimationFrame(() => {
@@ -1764,6 +1793,7 @@ watch(activeBackgroundSrc, src => {
 
 async function load() {
   if (!container.value) return
+  clearCharacterClickTracking()
 
   const char = store.characters.find(c => c.id === store.selectedCharacterId)
   if (!char) return
@@ -2052,6 +2082,7 @@ async function load() {
   updateCanvasPointerEvents(player)
 }
 watch(() => store.selectedCharacterId, () => {
+  preloadSelectedCharacterAudio()
   if (recorder && recorder.state === 'recording') {
     cancelExport = true
     recorder.stop()
@@ -2064,7 +2095,8 @@ watch(() => store.selectedCharacterId, () => {
   void load()
 })
 
-watch(() => store.animationCategory, () => {
+watch(() => store.animationCategory, category => {
+  if (category !== 'character') stopCharacterAudio()
   if (recorder && recorder.state === 'recording') {
     cancelExport = true
     recorder.stop()
@@ -2077,6 +2109,7 @@ watch(() => store.animationCategory, () => {
 })
 
 watch(() => store.selectedAnimation, anim => {
+  if (anim !== CHARACTER_IDLE_ANIMATION) stopCharacterAudio()
   if (recorder && recorder.state === 'recording') {
     cancelExport = true
     recorder.stop()
@@ -2133,6 +2166,7 @@ watch(() => store.playing, playing => {
     }
     player.play()
   } else {
+    stopCharacterAudio()
     compositeLastTimestamp = null
     overlayLastTimestamp = null
     stopOverlayRendering()
@@ -2142,6 +2176,10 @@ watch(() => store.playing, playing => {
 
 watch(() => store.animationSpeed, speed => {
   if (player) player.speed = speed
+})
+
+watch(() => settingsStore.audioLanguage, () => {
+  preloadSelectedCharacterAudio()
 })
 
 watch(() => store.backgroundColor, () => {
@@ -2175,6 +2213,24 @@ function isPointInPolygon(px: number, py: number, vertices: Float32Array): boole
   return inside
 }
 
+function isPointInTriangle(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+) {
+  const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by)
+  const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy)
+  const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay)
+  const hasNegative = d1 < 0 || d2 < 0 || d3 < 0
+  const hasPositive = d1 > 0 || d2 > 0 || d3 > 0
+  return !(hasNegative && hasPositive)
+}
+
 function getCameraState() {
   const renderCam = player?.sceneRenderer?.camera
   if (!renderCam) return null
@@ -2187,26 +2243,270 @@ function getCameraState() {
   }
 }
 
-function onViewerPointerDown(e: PointerEvent) {
-  if (!store.layerSelectionEnabled || !player || editingBackground.value) return
-  if (e.button !== 0) return
-
+function getWorldPoint(clientX: number, clientY: number) {
   const bounds = viewerWrapper.value?.getBoundingClientRect()
-  if (!bounds) return
-
   const camState = getCameraState()
-  if (!camState) return
+  if (!bounds || bounds.width <= 0 || bounds.height <= 0 || !camState) return null
 
-  const screenX = e.clientX - bounds.left
-  const screenY = e.clientY - bounds.top
-
-  const { cx, cy, zoom, vw, vh } = camState
-
+  const screenX = clientX - bounds.left
+  const screenY = clientY - bounds.top
   const nx = (screenX / bounds.width) * 2 - 1
   const ny = 1 - 2 * (screenY / bounds.height)
+  const { cx, cy, zoom, vw, vh } = camState
 
-  const wx = nx * (vw / 2) * zoom + cx
-  const wy = ny * (vh / 2) * zoom + cy
+  return {
+    x: nx * (vw / 2) * zoom + cx,
+    y: ny * (vh / 2) * zoom + cy,
+  }
+}
+
+function isRenderableAttachmentHit(slot: Slot, worldX: number, worldY: number) {
+  const attachment = slot.getAttachment()
+  if (!attachment) return false
+
+  if (attachment instanceof RegionAttachment) {
+    if (attachment.color.a <= 0) return false
+    const worldVertices = new Float32Array(8)
+    attachment.computeWorldVertices(slot, worldVertices, 0, 2)
+    return isPointInPolygon(worldX, worldY, worldVertices)
+  }
+
+  if (attachment instanceof MeshAttachment) {
+    if (attachment.color.a <= 0 || attachment.worldVerticesLength <= 0) return false
+    const worldVertices = new Float32Array(attachment.worldVerticesLength)
+    attachment.computeWorldVertices(slot, 0, attachment.worldVerticesLength, worldVertices, 0, 2)
+
+    for (let i = 0; i + 2 < attachment.triangles.length; i += 3) {
+      const a = attachment.triangles[i] * 2
+      const b = attachment.triangles[i + 1] * 2
+      const c = attachment.triangles[i + 2] * 2
+      if (
+        isPointInTriangle(
+          worldX,
+          worldY,
+          worldVertices[a],
+          worldVertices[a + 1],
+          worldVertices[b],
+          worldVertices[b + 1],
+          worldVertices[c],
+          worldVertices[c + 1],
+        )
+      ) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+function isCharacterHit(clientX: number, clientY: number) {
+  const skeleton = player?.skeleton
+  const worldPoint = getWorldPoint(clientX, clientY)
+  if (!skeleton || !worldPoint || skeleton.color.a <= 0) return false
+
+  for (let i = skeleton.drawOrder.length - 1; i >= 0; i--) {
+    const slot = skeleton.drawOrder[i]
+    const slotName = slot.data.name
+    if (isBackgroundSlot(slotName) || store.layerVisibility[slotName] === false || slot.color.a <= 0) continue
+    if (isRenderableAttachmentHit(slot, worldPoint.x, worldPoint.y)) return true
+  }
+
+  return false
+}
+
+function getSelectedCharacterAudioConfig() {
+  const character = selectedCharacter.value
+  const audioName = character?.audio?.trim()
+  if (!character || !audioName) return null
+
+  const audioCharacterId = character.id
+  if (!/^\d+(?:_c)?$/i.test(audioCharacterId)) return null
+
+  const language = settingsStore.audioLanguage
+  return {
+    key: `${audioCharacterId}/${language}/${audioName}`,
+    urls: [1, 2, 3].map(
+      index => `${getAudioAssetRoot()}/${audioCharacterId}/${language}/${audioName}_${index}.webm`,
+    ),
+  }
+}
+
+function stopCharacterAudio() {
+  const audio = activeCharacterAudio
+  activeCharacterAudio = null
+  if (!audio) return
+
+  audio.pause()
+  try {
+    audio.currentTime = 0
+  } catch {
+    // Metadata may not be available yet; pausing is enough in that case.
+  }
+}
+
+function clearCharacterAudioPool() {
+  stopCharacterAudio()
+  characterAudioPool?.clips.forEach(audio => {
+    audio.pause()
+    audio.removeAttribute('src')
+    audio.load()
+  })
+  characterAudioPool = null
+  nextCharacterAudioIndex = 0
+}
+
+function preloadSelectedCharacterAudio() {
+  const config = getSelectedCharacterAudioConfig()
+  if (config && characterAudioPool?.key === config.key) return
+
+  clearCharacterAudioPool()
+  if (!config) return
+
+  const clips = config.urls.map(url => {
+    const audio = new Audio()
+    audio.preload = 'auto'
+    audio.src = url
+    audio.addEventListener('ended', () => {
+      if (activeCharacterAudio === audio) activeCharacterAudio = null
+    })
+    audio.load()
+    return audio
+  })
+  characterAudioPool = { key: config.key, clips }
+}
+
+function playNextCharacterAudio() {
+  const config = getSelectedCharacterAudioConfig()
+  if (!config) return
+  if (characterAudioPool?.key !== config.key) preloadSelectedCharacterAudio()
+
+  const clips = characterAudioPool?.clips
+  if (!clips?.length) return
+
+  stopCharacterAudio()
+  const audio = clips[nextCharacterAudioIndex % clips.length]
+  nextCharacterAudioIndex = (nextCharacterAudioIndex + 1) % clips.length
+  activeCharacterAudio = audio
+  try {
+    audio.currentTime = 0
+  } catch {
+    // play() will begin at the start when metadata has not loaded yet.
+  }
+  void audio.play().catch(() => {
+    if (activeCharacterAudio === audio) activeCharacterAudio = null
+  })
+}
+
+function canTriggerCharacterMotion() {
+  if (
+    !player ||
+    store.animationCategory !== 'character' ||
+    store.selectedAnimation !== CHARACTER_IDLE_ANIMATION ||
+    !store.playing ||
+    store.layerSelectionEnabled ||
+    editingBackground.value ||
+    isDraggingBackground.value ||
+    isResizingBackground.value ||
+    showingMobileOverlay.value ||
+    exportingAnimation ||
+    exportingFrames ||
+    compositeActive ||
+    forceTransparentClear ||
+    activePointerId !== null ||
+    (recorder !== null && recorder.state !== 'inactive')
+  ) {
+    return false
+  }
+
+  const state = player.animationState
+  const current = state?.getCurrent(0)
+  if (!state || current?.animation?.name !== CHARACTER_IDLE_ANIMATION || current.next) return false
+
+  return state.data.skeletonData.animations.some(animation => animation.name === CHARACTER_MOTION_ANIMATION)
+}
+
+function playCharacterMotion() {
+  if (!player || !canTriggerCharacterMotion()) return false
+  const state = player.animationState
+  if (!state) return false
+  const motionAnimation = state.data.skeletonData.animations.find(
+    animation => animation.name === CHARACTER_MOTION_ANIMATION,
+  )
+  if (!motionAnimation) return false
+
+  state.setAnimation(0, CHARACTER_MOTION_ANIMATION, false)
+  state.addAnimation(0, CHARACTER_IDLE_ANIMATION, true, motionAnimation.duration)
+  return true
+}
+
+function clearCharacterClickTracking() {
+  window.removeEventListener('pointermove', onCharacterClickPointerMove, true)
+  window.removeEventListener('pointerup', onCharacterClickPointerUp, true)
+  window.removeEventListener('pointercancel', onCharacterClickPointerCancel, true)
+  characterClickCandidate = null
+}
+
+function onCharacterClickPointerMove(event: PointerEvent) {
+  const candidate = characterClickCandidate
+  if (!candidate || event.pointerId !== candidate.pointerId || candidate.moved) return
+  const dx = event.clientX - candidate.startX
+  const dy = event.clientY - candidate.startY
+  if (Math.hypot(dx, dy) > CHARACTER_CLICK_DRAG_THRESHOLD) {
+    candidate.moved = true
+  }
+}
+
+function onCharacterClickPointerUp(event: PointerEvent) {
+  const candidate = characterClickCandidate
+  if (!candidate || event.pointerId !== candidate.pointerId) return
+
+  const isClick = !candidate.moved
+  const isSameViewer = candidate.player === player && candidate.characterId === store.selectedCharacterId
+  clearCharacterClickTracking()
+
+  if (isClick && isSameViewer && canTriggerCharacterMotion() && isCharacterHit(event.clientX, event.clientY)) {
+    if (playCharacterMotion()) {
+      playNextCharacterAudio()
+      emit('character-interaction')
+    }
+  }
+}
+
+function onCharacterClickPointerCancel(event: PointerEvent) {
+  if (event.pointerId === characterClickCandidate?.pointerId) {
+    clearCharacterClickTracking()
+  }
+}
+
+function startCharacterClickTracking(event: PointerEvent) {
+  clearCharacterClickTracking()
+  if (!player || !event.isPrimary || !canTriggerCharacterMotion()) return
+
+  characterClickCandidate = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    moved: false,
+    player,
+    characterId: store.selectedCharacterId,
+  }
+  window.addEventListener('pointermove', onCharacterClickPointerMove, true)
+  window.addEventListener('pointerup', onCharacterClickPointerUp, true)
+  window.addEventListener('pointercancel', onCharacterClickPointerCancel, true)
+}
+
+function onViewerPointerDown(e: PointerEvent) {
+  if (!player || editingBackground.value) return
+  if (e.button !== 0) return
+
+  if (!store.layerSelectionEnabled) {
+    startCharacterClickTracking(e)
+    return
+  }
+
+  const worldPoint = getWorldPoint(e.clientX, e.clientY)
+  if (!worldPoint) return
 
   const slots = player.skeleton?.drawOrder
   if (!slots) return
@@ -2221,7 +2521,7 @@ function onViewerPointerDown(e: PointerEvent) {
     if (attachment && vertexCount > 0 && typeof attachment.computeWorldVertices === 'function') {
       const worldVertices = new Float32Array(vertexCount)
       attachment.computeWorldVertices(slot as Slot, 0, vertexCount, worldVertices, 0, 2)
-      if (isPointInPolygon(wx, wy, worldVertices)) {
+      if (isPointInPolygon(worldPoint.x, worldPoint.y, worldVertices)) {
         if (store.selectedLayerName !== slot.data.name) {
           store.selectedLayerName = slot.data.name
         } else {
@@ -2323,11 +2623,14 @@ onMounted(() => {
   if (activeBackgroundSrc.value) {
     setBackgroundSource(activeBackgroundSrc.value)
   }
+  preloadSelectedCharacterAudio()
   void load()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
+  clearCharacterClickTracking()
+  clearCharacterAudioPool()
   stopPointerTracking()
   resetComposite()
   clearExternalSkeletonCache()
@@ -2512,6 +2815,7 @@ async function exportAnimation(transparent: boolean): Promise<void> {
   const cam = manualCamera
   if (!p || !cam) return
 
+  stopCharacterAudio()
   cancelExport = false
   exportingAnimation = true
 
@@ -2694,6 +2998,7 @@ function exportAnimationFrames(transparent: boolean): Promise<void> {
   const cam = manualCamera
   if (!p || !cam) return Promise.resolve()
 
+  stopCharacterAudio()
   cancelExport = false
   exportingFrames = true
   exportingAnimation = true
