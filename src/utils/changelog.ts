@@ -1,5 +1,15 @@
 export default [
   {
+    "date": "27/08/2026",
+    "changes": [
+      "Updated Yuri: Forever Mascot fated guest animations (forgot to do that in the last update).",
+      "Added Blade: Tender Dream and Aquila: Savage Warrior character icons and voices.",
+      "Added Blade: Tender Dream and Aquila: Savage Warrior standing animations.",
+      "Added Blade: Tender Dream and Aquila: Savage Warrior ultimate animations.",
+      "As always, if you like my work and want to support me so I can keep working on adding more features and improving the site you can do so by donating in either my Ko-Fi or Patreon <3."
+    ]
+  },
+  {
     "date": "13/08/2026",
     "changes": [
       "Updated Glacia: Heavenly Guardian Successor ultimate animation.",

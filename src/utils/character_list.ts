@@ -988,6 +988,15 @@ export default {
     "dating": "",
     "audio": "Char003703_BattleReady"
   },
+  "003793": {
+    "charName": "Blade",
+    "costumeName": "Tender Dream",
+    "spine": "char003793",
+    "cutscene": "cutscene_char003793",
+    "dating": "",
+    "audio": "Char003793_BattleReady",
+    "displayMode": "new"
+  },
   "003801": {
     "charName": "Liberta",
     "costumeName": "Dark Saintess",
@@ -1342,8 +1351,7 @@ export default {
     "spine": "char061003",
     "cutscene": "cutscene_char061003",
     "dating": "",
-    "audio": "Char061003_BattleReady",
-    "displayMode": "new"
+    "audio": "Char061003_BattleReady"
   },
   "061092": {
     "charName": "Helena",
@@ -1384,8 +1392,7 @@ export default {
     "cutscene": "cutscene_char061302",
     "dating": "illust_dating20",
     "datingUsesTracks": true,
-    "audio": "Char061302_BattleReady",
-    "displayMode": "new"
+    "audio": "Char061302_BattleReady"
   },
   "061305": {
     "charName": "Dalvi",
@@ -1409,8 +1416,7 @@ export default {
     "spine": "char061392",
     "cutscene": "cutscene_char061392",
     "dating": "",
-    "audio": "Char061392_BattleReady",
-    "displayMode": "new"
+    "audio": "Char061392_BattleReady"
   },
   "061402": {
     "charName": "Zenith",
@@ -1500,7 +1506,8 @@ export default {
     "cutscene": "cutscene_char065193",
     "dating": "illust_dating21",
     "datingUsesTracks": true,
-    "audio": "Char065193_BattleReady"
+    "audio": "Char065193_BattleReady",
+    "displayMode": "updated"
   },
   "065802": {
     "charName": "Nartas",
@@ -1590,8 +1597,7 @@ export default {
     "spine": "char066907",
     "cutscene": "cutscene_char066907",
     "dating": "",
-    "audio": "Char066907_BattleReady",
-    "displayMode": "updated"
+    "audio": "Char066907_BattleReady"
   },
   "067002": {
     "charName": "Ventana",
@@ -1803,6 +1809,15 @@ export default {
     "cutscene": "cutscene_char067803",
     "dating": "",
     "audio": "Char067803_BattleReady"
+  },
+  "067901": {
+    "charName": "Aquila",
+    "costumeName": "Savage Warrior",
+    "spine": "char067901",
+    "cutscene": "cutscene_char067901",
+    "dating": "",
+    "audio": "Char067901_BattleReady",
+    "displayMode": "new"
   },
   "ellin": {
     "charName": "Ellin (Npc)",
