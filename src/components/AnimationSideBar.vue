@@ -29,10 +29,11 @@
             <option v-for="skin in skins" :key="skin" :value="skin">{{ skin }}</option>
           </select>
           <span>Animations</span>
-          <div class="overflow-y-auto sidebar-scroll flex-1">
+          <div ref="animationListRef" class="overflow-y-auto sidebar-scroll flex-1">
             <div
               v-for="name in animations"
               :key="name"
+              :data-selected="name === selectedAnimation || undefined"
               class="py-2 pl-2 cursor-pointer"
               :class="{ 'bg-gray-700': name === selectedAnimation }"
               @click="select(name)"
@@ -199,7 +200,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRefs, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, toRefs, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useCharacterStore } from '@/stores/characterStore'
 
 import LoadingIcon from '@/components/icons/LoadingIcon.vue';
@@ -214,6 +215,7 @@ const showExportMenu = ref(false)
 const desktopExportRef = ref<HTMLElement | null>(null)
 const mobileExportRef = ref<HTMLElement | null>(null)
 const sidebarTab = ref<'controls' | 'layers'>('controls')
+const animationListRef = ref<HTMLElement | null>(null)
 const layerFilter = ref('')
 
 const emit = defineEmits(['select', 'reset-camera', 'screenshot', 'export-animation', 'category-change'])
@@ -294,6 +296,12 @@ function isLayerVisible(name: string) {
 function toggleLayer(name: string) {
   store.layerVisibility[name] = !isLayerVisible(name)
 }
+
+watch(selectedAnimation, () => {
+  nextTick(() => {
+    animationListRef.value?.querySelector('[data-selected]')?.scrollIntoView({ block: 'nearest' })
+  })
+})
 
 watch(() => store.animationCategory, () => {
   emit('category-change');

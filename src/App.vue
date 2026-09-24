@@ -393,6 +393,44 @@ function onSelectAnimation(name: string) {
   showMobileControls.value = false
 }
 
+function isTypingTarget(target: EventTarget | null) {
+  if (target instanceof HTMLInputElement) return !['range', 'checkbox', 'radio', 'color'].includes(target.type)
+  return (
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  )
+}
+
+function onShortcutKeyDown(e: KeyboardEvent) {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+  if (navbarOverlayActive.value || isTypingTarget(e.target)) return
+
+  if (e.key === ' ') {
+    e.preventDefault()
+    // Drop focus so the keyup doesn't also activate a focused button or checkbox
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    if (!e.repeat) store.playing = !store.playing
+  } else if (e.key.toLowerCase() === 'f') {
+    if (!e.repeat) viewerRef.value?.toggleFullscreen()
+  } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    // Range inputs (e.g. the seek bar) use arrows natively
+    if (e.target instanceof HTMLInputElement) return
+    e.preventDefault()
+    selectAdjacentAnimation(e.key === 'ArrowDown' ? 1 : -1)
+  }
+}
+
+function selectAdjacentAnimation(step: 1 | -1) {
+  if (!animations.value.length) return
+  const count = animations.value.length
+  const current = animations.value.indexOf(store.selectedAnimation)
+  const next = current === -1
+    ? (step === 1 ? 0 : count - 1)
+    : (current + step + count) % count
+  store.selectedAnimation = animations.value[next]
+}
+
 function onResetCamera() {
   viewerRef.value?.resetCamera()
 }
@@ -504,10 +542,12 @@ onMounted(() => {
   mobileNavbarMediaQuery = window.matchMedia('(max-width: 767px)')
   updateMobileNavbarLayout()
   mobileNavbarMediaQuery.addEventListener('change', updateMobileNavbarLayout)
+  window.addEventListener('keydown', onShortcutKeyDown)
   initializeInteractionTutorial()
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onShortcutKeyDown)
   clearLayerSelectionHintTimeout()
   clearTutorialRetryTimeout()
   mobileNavbarMediaQuery?.removeEventListener('change', updateMobileNavbarLayout)

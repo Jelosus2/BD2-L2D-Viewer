@@ -1,5 +1,5 @@
 <template>
-  <div class="relative w-full h-full" data-tutorial="character-viewer">
+  <div ref="rootRef" class="relative w-full h-full" data-tutorial="character-viewer">
     <div
       ref="toolbarRef"
       class="absolute left-2 flex flex-col gap-2 pointer-events-auto transition-opacity duration-150"
@@ -203,6 +203,7 @@ type CharacterAudioPool = {
 }
 
 const container = ref<HTMLDivElement | null>(null)
+const rootRef = ref<HTMLDivElement | null>(null)
 const viewerWrapper = ref<HTMLDivElement | null>(null)
 const toolbarRef = ref<HTMLDivElement | null>(null)
 const backgroundImageWrapperRef = ref<HTMLDivElement | null>(null)
@@ -3258,7 +3259,15 @@ function exportAnimationFrames(transparent: boolean): Promise<void> {
   })
 }
 
-defineExpose({ resetCamera, zoomIn, zoomOut, saveScreenshot, exportAnimation, exportAnimationFrames })
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    void document.exitFullscreen()
+  } else {
+    rootRef.value?.requestFullscreen().catch(error => console.error('Failed to enter fullscreen:', error))
+  }
+}
+
+defineExpose({ resetCamera, zoomIn, zoomOut, saveScreenshot, exportAnimation, exportAnimationFrames, toggleFullscreen })
 </script>
 <style scoped>
 .seek-range {
