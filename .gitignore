@@ -28,3 +28,12 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+# Generated rewrite data and media
+/public/data/
+/public/assets/spine/
+/public/assets/backgrounds/
+/public/assets/audio/
+
+# Asset preparation workspace
+/.scene-updates/

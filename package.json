@@ -14,11 +14,13 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
-    "@esotericsoftware/spine-player": "4.1.55",
+    "@esotericsoftware/spine-pixi": "4.1.56",
+    "@esotericsoftware/spine-player": "4.1.56",
     "@tailwindcss/vite": "^4.1.10",
     "jszip": "^3.10.1",
     "mediabunny": "^1.56.1",
     "pinia": "^3.0.1",
+    "pixi.js": "7.4.3",
     "tailwindcss": "^4.1.10",
     "vue": "^3.5.13"
   },
