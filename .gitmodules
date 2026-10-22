@@ -1,0 +1,3 @@
+[submodule "tools"]
+	path = tools
+	url = https://github.com/Jelosus2/BD2-L2D-Viewer-tools.git
