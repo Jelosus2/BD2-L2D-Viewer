@@ -1092,8 +1092,7 @@ export default {
     "spine": "char004192",
     "cutscene": "cutscene_char004192",
     "dating": "",
-    "audio": "Char004192_BattleReady",
-    "displayMode": "new"
+    "audio": "Char004192_BattleReady"
   },
   "004201": {
     "charName": "Palette",
@@ -1126,8 +1125,7 @@ export default {
     "spine": "char004302",
     "cutscene": "cutscene_char004302",
     "dating": "",
-    "audio": "Char004302_BattleReady",
-    "displayMode": "new"
+    "audio": "Char004302_BattleReady"
   },
   "020001": {
     "charName": "Eris",
@@ -1878,10 +1876,10 @@ export default {
     "charName": "Aquila",
     "costumeName": "Sealed Desires",
     "spine": "char067902",
-    "cutscene": "",
+    "cutscene": "cutscene_char067902",
     "dating": "",
     "audio": "Char067902_BattleReady",
-    "displayMode": "new"
+    "displayMode": "updated"
   },
   "ellin": {
     "charName": "Ellin (Npc)",

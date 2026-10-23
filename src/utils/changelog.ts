@@ -1,5 +1,13 @@
 export default [
   {
+    "date": "22/10/2026",
+    "changes": [
+      "Added Aquila: Sealed Desire ultimate animations.",
+      "Couldn't add Aquila: Sealed Desires fated guests animations due to a change in the format, it will be uploaded at a later date.",
+      "As always, if you like my work and want to support me so I can keep working on adding more features and improving the site you can do so by donating in either my Ko-Fi or Patreon <3."
+    ]
+  },
+  {
     "date": "08/10/2026",
     "changes": [
       "Added Tyr: Clumsy Wuff, Nekyndalia: Unraveling Mummy and Aquila: Sealed Desires icons and voices.",
