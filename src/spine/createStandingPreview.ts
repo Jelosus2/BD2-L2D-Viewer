@@ -123,8 +123,18 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
 
         if (data.version !== media.version)
             throw new Error(`Spine version mismatch: ${data.version}`);
-        if (!data.findAnimation(component.initialAnimation))
-            throw new Error(`Animation not found: ${component.initialAnimation}`);
+
+        const startupSequence = component.startupSequence ?? [{
+            animation: component.initialAnimation,
+            loop: component.initialLoop,
+        }];
+
+        for (const entry of startupSequence)
+        {
+            if (!data.findAnimation(entry.animation))
+                throw new Error(`Animation not found: ${entry.animation}`);
+        }
+
         if (!data.findSkin(component.skin))
             throw new Error(`Skin not found: ${component.skin}`);
 
@@ -176,7 +186,13 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
         for (const mix of media.mixes)
             spine.state.data.setMix(mix.from, mix.to, mix.seconds);
 
-        spine.state.setAnimation(0, component.initialAnimation, component.initialLoop);
+        startupSequence.forEach((entry, index) => {
+            if (index === 0)
+                spine.state.setAnimation(0, entry.animation, entry.loop);
+            else
+                spine.state.addAnimation(0, entry.animation, entry.loop, 0);
+        });
+
         spine.update(0);
 
         function resize() {

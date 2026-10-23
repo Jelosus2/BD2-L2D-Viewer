@@ -108,6 +108,21 @@ export async function loadStandingScene(catalogUrl: string, signal: AbortSignal)
     const component = object(array(rawNodes[rawNodes.length - 1]!.components)[0]);
     check(component.kind === "spine", "expected a Spine component");
 
+    const initialAnimation = text(component.initialAnimation);
+    const initialLoop = boolean(component.initialLoop);
+    const startupSequence = component.startupSequence === undefined
+        ? undefined
+        : array(component.startupSequence).map((value) => {
+            const entry = object(value);
+            return { animation: text(entry.animation), loop: boolean(entry.loop) };
+        });
+
+    if (startupSequence !== undefined)
+    {
+        check(startupSequence.length > 0, "empty startup sequence");
+        check(startupSequence[0]!.animation === initialAnimation && startupSequence[0]!.loop === initialLoop, "startup sequence does not match initial animation");
+    }
+
     const color = object(component.color);
     const mediaId = text(component.mediaId);
     const media = object(object(scene.media)[mediaId]);
@@ -145,8 +160,9 @@ export async function loadStandingScene(catalogUrl: string, signal: AbortSignal)
             mediaId,
             enabled: boolean(component.enabled),
             skin: text(component.skin),
-            initialAnimation: text(component.initialAnimation),
-            initialLoop: boolean(component.initialLoop),
+            initialAnimation,
+            initialLoop,
+            startupSequence,
             flipX: boolean(component.flipX),
             flipY: boolean(component.flipY),
             renderScale: number(component.renderScale, Number.MIN_VALUE),

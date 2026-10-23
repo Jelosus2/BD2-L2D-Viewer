@@ -53,6 +53,7 @@ export type SceneComponent = {
             renderScale: number;
             initialAnimation: string | null;
             initialLoop: boolean;
+            startupSequence?: Array<{ animation: string; loop: boolean }>;
         }
         | {
             kind: "image";
