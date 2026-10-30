@@ -10,10 +10,12 @@ const pinia = createPinia();
 const store = useCharacterStore(pinia);
 applyUrlParams(store, window.location.search);
 
-const showPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get("preview") === "spine";
-const rootComponent = showPreview
+const preview = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("preview") : null;
+const rootComponent = preview === "spine"
     ? defineAsyncComponent(() => import("./components/SpinePreview.vue"))
-    : App;
+    : preview === "cutscene"
+        ? defineAsyncComponent(() => import("./components/CutscenePreview.vue"))
+        : App;
 
 const app = createApp(rootComponent);
 app.use(pinia);

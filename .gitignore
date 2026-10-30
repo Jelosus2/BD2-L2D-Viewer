@@ -34,6 +34,7 @@ coverage
 /public/assets/spine/
 /public/assets/backgrounds/
 /public/assets/audio/
+/public/assets/scenes/
 
 # Asset preparation workspace
 /.scene-updates/

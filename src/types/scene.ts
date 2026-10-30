@@ -39,6 +39,12 @@ export interface SceneLayout {
     | { mode: "expand" | "shrink" };
 }
 
+export interface ImageSlicing {
+    border: { left: number; bottom: number; right: number; top: number };
+    pixelsPerUnit: number;
+    fillCenter: boolean;
+}
+
 export type SceneComponent = {
     id: string;
     enabled: boolean;
@@ -58,7 +64,9 @@ export type SceneComponent = {
         | {
             kind: "image";
             mediaId: string;
+            blendMode: "normal" | "additive" | "multiply";
             uvRect: { x: number; y: number; width: number; height: number };
+            slicing?: ImageSlicing;
         }
     );
 
@@ -112,7 +120,19 @@ export interface ActivationTrack {
 export type NodeScalarProperty =
     | "opacity"
     | "layout.rotationDegrees"
-    | `layout.${"position" | "anchoredPosition" | "scale" | "pivot" | "sizeDelta"}.${"x" | "y"}`;
+    | `layout.${"position"| "anchoredPosition"| "anchorMin"| "anchorMax"| "scale"| "pivot"| "sizeDelta"}.${"x"| "y"}`;
+
+export type ScalarPropertyKey = {
+    time: number;
+    value: number;
+} & (
+    | { interpolation: "step" }
+    | { interpolation: "linear" }
+    | {
+        interpolation: "cubic";
+        coefficients: [cubic: number, quadratic: number, linear: number];
+    }
+);
 
 export type PropertyTrack =
     | {
@@ -124,11 +144,7 @@ export type PropertyTrack =
             id: string;
             property: `color.${"r" | "g" | "b" | "a"}`;
         };
-        keys: Array<{
-            time: number;
-            value: number;
-            interpolation: "step" | "linear";
-        }>;
+        keys: ScalarPropertyKey[];
     }
     | {
         kind: "boolean";

@@ -70,14 +70,14 @@ export async function loadStandingScene(catalogUrl: string, signal: AbortSignal)
         check(array(node.components).length === (index === rawNodes.length - 1 ? 1 : 0), "expected one Spine component on the last node");
 
         return {
-            id: ids[index]!,
+            id: ids[index],
             active: boolean(node.active),
             opacity: number(node.opacity, 0, 1),
             layout: rect(node.layout),
         };
     });
 
-    const last = nodes[nodes.length - 1]!;
+    const last = nodes[nodes.length - 1];
     check(last.layout.pivot.x === 0.5 && last.layout.pivot.y === 0.5, "Spine node requires a centered pivot");
 
     const profileIds = new Set<string>();
@@ -97,7 +97,7 @@ export async function loadStandingScene(catalogUrl: string, signal: AbortSignal)
             ids.every((nodeId) => Object.prototype.hasOwnProperty.call(overrides, nodeId)), "profile node mismatch");
 
         const nodeLayouts = Object.fromEntries(ids.map((nodeId) => [nodeId, rect(overrides[nodeId])]));
-        check(nodeLayouts[last.id]!.pivot.x === 0.5 && nodeLayouts[last.id]!.pivot.y === 0.5,
+        check(nodeLayouts[last.id].pivot.x === 0.5 && nodeLayouts[last.id].pivot.y === 0.5,
             "Spine profile requires a centered pivot");
 
         return { id, orientation, referenceSize: vector(profile.referenceSize, Number.MIN_VALUE), nodeLayouts };
@@ -105,7 +105,7 @@ export async function loadStandingScene(catalogUrl: string, signal: AbortSignal)
 
     check(scene.variant !== "standing-source" || layoutProfiles.length === 2, "source scene requires both profiles");
 
-    const component = object(array(rawNodes[rawNodes.length - 1]!.components)[0]);
+    const component = object(array(rawNodes[rawNodes.length - 1].components)[0]);
     check(component.kind === "spine", "expected a Spine component");
 
     const initialAnimation = text(component.initialAnimation);
@@ -120,7 +120,7 @@ export async function loadStandingScene(catalogUrl: string, signal: AbortSignal)
     if (startupSequence !== undefined)
     {
         check(startupSequence.length > 0, "empty startup sequence");
-        check(startupSequence[0]!.animation === initialAnimation && startupSequence[0]!.loop === initialLoop, "startup sequence does not match initial animation");
+        check(startupSequence[0].animation === initialAnimation && startupSequence[0].loop === initialLoop, "startup sequence does not match initial animation");
     }
 
     const color = object(component.color);

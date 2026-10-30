@@ -1,11 +1,11 @@
 import type { StandingScene } from "@/data/loadStandingScene";
 
 import { readAsset } from "@/data/readAsset";
-import { resolveRectLayout } from "@/spine/resolveRectLayout";
+import { resolveRectLayout } from "./resolveRectLayout";
+import { SceneSlotMesh } from "./SceneSlotMesh";
 import { ALPHA_MODES, Application, BaseTexture, Container, extensions } from "pixi.js";
 import {
     AtlasAttachmentLoader,
-    DarkSlotMesh,
     DarkTintRenderer,
     SkeletonBinary,
     Spine,
@@ -78,7 +78,7 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
             if (!Object.prototype.hasOwnProperty.call(media.pages, page.name))
                 throw new Error(`Atlas page not declared: ${page.name}`);
 
-            const bytes = await readAsset(media.pages[page.name]!, controller.signal);
+            const bytes = await readAsset(media.pages[page.name], controller.signal);
             const blob = new Blob([bytes]);
             controller.signal.throwIfAborted();
 
@@ -152,7 +152,7 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
 
         const spine = new Spine(data, {
             autoUpdate: false,
-            slotMeshFactory: () => new DarkSlotMesh(),
+            slotMeshFactory: () => new SceneSlotMesh()
         });
 
         const canvasRoot = new Container();
@@ -221,7 +221,7 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
             scene.nodes.forEach((node, index) => {
                 const layout = profile?.nodeLayouts[node.id] ?? node.layout;
                 const resolved = resolveRectLayout(layout, parentSize, parentPivot);
-                const container = containers[index]!;
+                const container = containers[index];
 
                 container.position.set(resolved.position.x, -resolved.position.y);
                 container.scale.set(layout.scale.x, layout.scale.y);
