@@ -11,12 +11,13 @@ import type {
     SpineClip,
     ImageSlicing
 } from "@/types/scene";
+import type { AudioCue, AudioMedia } from "@/types/audio";
 
 import { readAsset } from "@/data/readAsset";
 import { createPropertySampler } from "@/scene/createPropertySampler";
 
 export interface CutsceneScene extends Omit<SceneManifest, "media" | "timeline" | "layoutProfiles"> {
-    media: Record<string, SpineMedia | ImageMedia>;
+    media: Record<string, SpineMedia | ImageMedia | AudioMedia>;
     timeline: SceneTimeline;
 }
 
@@ -144,12 +145,8 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
         );
     }
 
-    check(usedMedia.size === media.size, "unreferenced media");
-
     const byId = new Map(nodes.map((node) => [node.id, node]));
     const timeline = object(scene.timeline);
-    check(array(timeline.audioCues).length === 0, "audio cues are not supported yet");
-
     const clipIds = new Set<string>();
     const spineTargets = new Set<string>();
     const spineTracks = array(timeline.spineTracks).map((value) => {
@@ -279,10 +276,49 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
         return track;
     });
 
+    const audioIds = new Set<string>();
+    let previousAudioStart = 0;
+
+    const audioCues = array(timeline.audioCues).map((value): AudioCue => {
+        const entry = object(value);
+        const id = text(entry.id);
+        const mediaId = text(entry.mediaId);
+        const asset = media.get(mediaId);
+
+        check(!audioIds.has(id) && !clipIds.has(id), "duplicate audio cue ID");
+        check(asset?.kind === "audio", "invalid audio cue media");
+
+        const cue = {
+            id,
+            mediaId,
+            start: number(entry.start, 0),
+            sourceWindowSeconds: number(entry.sourceWindowSeconds, Number.MIN_VALUE),
+            offsetSeconds: number(entry.offsetSeconds, 0),
+            gain: number(entry.gain, 0, 1),
+            clipEndPolicy: {
+                mode: choice(object(entry.clipEndPolicy).mode, ["let-finish", "stop"]),
+            }
+        };
+
+        check(cue.start >= previousAudioStart, "unordered audio cues");
+        number(cue.start + cue.sourceWindowSeconds);
+
+        for (const variant of Object.values(asset.variants))
+            check(variant?.state === "ready" && cue.offsetSeconds < variant.durationSeconds, "audio offset exceeds recording");
+
+        audioIds.add(id);
+        usedMedia.add(mediaId);
+        previousAudioStart = cue.start;
+
+        return cue;
+    });
+
+    check(usedMedia.size === media.size, "unreferenced media");
+
     let durationSeconds: number | null = null;
     if (isLoop)
     {
-        check(timeline.durationSeconds === null && spineTracks.length === 0 && activationTracks.length === 0 && propertyTracks.length === 0,
+        check(timeline.durationSeconds === null && spineTracks.length === 0 && activationTracks.length === 0 && propertyTracks.length === 0 && audioCues.length === 0,
             "loop requires a static scene with no timeline tracks");
         check(nodes.every((node) => node.active), "loop contains inactive nodes");
 
@@ -293,6 +329,7 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
     else
     {
         durationSeconds = number(timeline.durationSeconds, Number.MIN_VALUE);
+        check(audioCues.every((cue) => cue.start <= durationSeconds!), "audio cue starts after scene end");
     }
 
     const coverage = object(scene.coverage);
@@ -316,7 +353,7 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
             spineTracks,
             activationTracks,
             propertyTracks,
-            audioCues: []
+            audioCues
         },
         coverage: {
             excluded: array(coverage.excluded).map(text),
@@ -402,10 +439,13 @@ function parseImageSlicing(value: unknown): ImageSlicing {
     };
 }
 
-function parseMedia(value: unknown): SpineMedia | ImageMedia {
+function parseMedia(value: unknown): SpineMedia | ImageMedia | AudioMedia {
     const entry = object(value);
     if (entry.kind === "image")
         return { kind: "image", file: file(entry.file), width: integer(entry.width, 1), height: integer(entry.height, 1) };
+
+    if (entry.kind === "audio")
+        return parseAudioMedia(entry);
 
     check(entry.kind === "spine" && /^4\.1\.\d+$/.test(text(entry.version)), "expected Spine 4.1 or image media");
     const pages = Object.entries(object(entry.pages));
@@ -430,6 +470,31 @@ function parseMedia(value: unknown): SpineMedia | ImageMedia {
 
             return { from, to, seconds: number(mix.seconds, 0) };
         })
+    };
+}
+
+function parseAudioMedia(entry: Record<string, unknown>): AudioMedia {
+    const role = choice(entry.role, ["voice", "effect"]);
+    const variants = object(entry.variants);
+    const languages = role === "voice" ? ["JP", "KR"] : ["default"];
+
+    check(Object.keys(variants).length === languages.length &&
+        languages.every((language) => Object.prototype.hasOwnProperty.call(variants, language)),
+        "invalid audio language variants");
+
+    return {
+        kind: "audio",
+        role,
+        variants: Object.fromEntries(languages.map((language) => {
+            const variant = object(variants[language]);
+            check(variant.state === "ready", "prototype requires prepared audio");
+
+            return [language, {
+                state: "ready" as const,
+                file: file(variant.file),
+                durationSeconds: number(variant.durationSeconds, Number.MIN_VALUE),
+            }];
+        }))
     };
 }
 

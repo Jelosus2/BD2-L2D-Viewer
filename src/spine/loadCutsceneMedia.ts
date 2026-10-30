@@ -1,11 +1,20 @@
 import type { SkeletonData } from "@esotericsoftware/spine-pixi";
 import type { CutsceneScene } from "@/data/loadCutsceneScene";
 import type { SceneMedia } from "./loadSceneMedia";
+import type { ImageMedia, SpineMedia } from "@/types/media";
 
 import { loadSceneMedia } from "./loadSceneMedia";
 
 export async function loadCutsceneMedia(scene: CutsceneScene, signal: AbortSignal): Promise<SceneMedia> {
-    const resources = await loadSceneMedia(scene.media, signal);
+    const visualMedia: Record<string, ImageMedia | SpineMedia> = {};
+
+    for (const [id, media] of Object.entries(scene.media))
+    {
+        if (media.kind !== "audio")
+            visualMedia[id] = media;
+    }
+
+    const resources = await loadSceneMedia(visualMedia, signal);
 
     try
     {

@@ -1,9 +1,12 @@
 import type { CutsceneScene } from "@/data/loadCutsceneScene";
+import type { CutsceneVoiceLanguage, CutsceneAudioResources } from "@/audio/loadCutsceneAudio";
 
-import { Application } from "pixi.js";
 import { loadCutsceneMedia } from "@/spine/loadCutsceneMedia";
 import { createCutsceneGraph } from "@/spine/createCutsceneGraph";
 import { createCutsceneTimeline } from "@/scene/createCutsceneTimeline";
+import { loadCutsceneAudio } from "@/audio/loadCutsceneAudio";
+import { createCutsceneAudioPlayback } from "@/audio/createCutsceneAudioPlayback";
+import { Application } from "pixi.js";
 
 export interface CutscenePreviewSnapshot {
     time: number;
@@ -12,9 +15,9 @@ export interface CutscenePreviewSnapshot {
 }
 
 export interface CutscenePreview {
-    play(): void;
+    play(): Promise<void>;
     pause(): void;
-    replay(): void;
+    replay(): Promise<void>;
     seek(timeSeconds: number): void;
     dispose(): void;
 }
@@ -25,6 +28,7 @@ export async function createCutscenePreview(
     signal: AbortSignal,
     onChange: (snapshot: CutscenePreviewSnapshot) => void,
     onError: (error: unknown) => void,
+    language: CutsceneVoiceLanguage = "JP"
 ): Promise<CutscenePreview> {
     const controller = new AbortController();
     let resources: Awaited<ReturnType<typeof loadCutsceneMedia>> | undefined;
@@ -37,17 +41,37 @@ export async function createCutscenePreview(
     let playing = false;
     let disposed = false;
     let previous: CutscenePreviewSnapshot | undefined;
+    let audioContext: AudioContext | undefined;
+    let audioResources: CutsceneAudioResources | undefined;
+    let audio: ReturnType<typeof createCutsceneAudioPlayback> | undefined;
+    let audioRunning = false;
+    let commandVersion = 0;
+    let wasHidden = document.hidden;
 
     function dispose() {
         if (disposed)
             return;
 
         disposed = true;
+        commandVersion++;
 
         cancelAnimationFrame(frame);
         observer?.disconnect();
         signal.removeEventListener("abort", dispose);
         document.removeEventListener("visibilitychange", visibility);
+
+        controller.abort(signal.aborted ? signal.reason : undefined);
+        audioRunning = false;
+        audio?.dispose();
+        audio = undefined;
+        audioResources?.dispose();
+        audioResources = undefined;
+
+        const context = audioContext;
+        audioContext = undefined;
+
+        if (context && context.state !== "closed")
+            void context.close().catch(() => {});
 
         timeline?.dispose();
         timeline = undefined;
@@ -57,8 +81,6 @@ export async function createCutscenePreview(
 
         app?.destroy(true, { children: true, texture: false, baseTexture: false });
         app = undefined;
-
-        controller.abort(signal.aborted ? signal.reason : undefined);
 
         resources?.dispose();
         resources = undefined;
@@ -75,7 +97,11 @@ export async function createCutscenePreview(
 
     function advance() {
         const now = performance.now();
-        timeline!.advance(Math.max(0, now - last) / 1000);
+        const delta = playing && audio
+            ? Math.max(0, audio.time - timeline!.time)
+            : Math.max(0, now - last) / 1000;
+
+        timeline!.advance(delta);
         last = now;
 
         const duration = timeline!.duration;
@@ -101,7 +127,8 @@ export async function createCutscenePreview(
             advance();
             draw();
 
-            frame = requestAnimationFrame(tick);
+            if (!disposed)
+                frame = requestAnimationFrame(tick);
         }
         catch (error)
         {
@@ -112,10 +139,45 @@ export async function createCutscenePreview(
 
     function visibility() {
         cancelAnimationFrame(frame);
-        last = performance.now();
+        if (disposed)
+            return;
 
-        if (!disposed && !document.hidden)
+        try
+        {
+            if (document.hidden)
+            {
+                audio?.pause();
+                if (!wasHidden)
+                    advance();
+
+                wasHidden = true;
+                last = performance.now();
+                return;
+            }
+
+            if (wasHidden && audioRunning)
+            {
+                audio!.play(audio!.time);
+                const version = commandVersion;
+
+                void audioContext!.resume().catch((error) => {
+                    if (!disposed && !document.hidden && version === commandVersion)
+                    {
+                        dispose();
+                        onError(error);
+                    }
+                });
+            }
+
+            wasHidden = false;
+            last = performance.now();
             frame = requestAnimationFrame(tick);
+        }
+        catch (error)
+        {
+            dispose();
+            onError(error);
+        }
     }
 
     function command(action: () => void) {
@@ -128,16 +190,83 @@ export async function createCutscenePreview(
         last = performance.now();
     }
 
+    async function start(restart: boolean) {
+        if (disposed)
+            throw new Error("Cutscene preview has been disposed.");
+
+        if (playing && !restart)
+            return;
+
+        const version = ++commandVersion;
+        const context = audioContext;
+
+        command(() => {
+            audio?.pause();
+            audioRunning = false;
+
+            const duration = timeline!.duration;
+            if (restart || (duration !== null && timeline!.time >= duration))
+                timeline!.seek(0);
+
+            timeline!.pause();
+            playing = false;
+        });
+
+        if (disposed || version !== commandVersion)
+            return;
+
+        if (context)
+            await context.resume();
+
+        if (disposed || version !== commandVersion)
+            return;
+
+        if (context && context.state !== "running")
+            throw new Error("Could not start cutscene audio playback.");
+
+        command(() => {
+            audio?.play(timeline!.time);
+            audioRunning = audio !== undefined;
+
+            if (document.hidden)
+                audio?.pause();
+
+            timeline!.resume();
+            playing = true;
+        });
+    }
+
     signal.addEventListener("abort", dispose, { once: true });
 
     try
     {
         signal.throwIfAborted();
 
-        resources = await loadCutsceneMedia(scene, controller.signal);
+        const visualMedia = await loadCutsceneMedia(scene, controller.signal);
+
+        if (disposed)
+            visualMedia.dispose();
+        else
+            resources = visualMedia;
+
         controller.signal.throwIfAborted();
 
-        graph = createCutsceneGraph(scene, resources);
+        if (scene.timeline.audioCues.length > 0)
+        {
+            audioContext = new AudioContext();
+
+            const decoded = await loadCutsceneAudio(scene, language, audioContext, controller.signal);
+
+            if (disposed)
+                decoded.dispose();
+            else
+                audioResources = decoded;
+
+            controller.signal.throwIfAborted();
+            audio = createCutsceneAudioPlayback(scene.timeline.audioCues, decoded.buffers, audioContext);
+        }
+
+        graph = createCutsceneGraph(scene, visualMedia);
         timeline = createCutsceneTimeline(scene, graph);
         timeline.pause();
 
@@ -149,6 +278,7 @@ export async function createCutscenePreview(
             autoDensity: true,
             resolution: Math.min(window.devicePixelRatio || 1, 2)
         });
+
         app.stage.addChild(graph.root);
         app.view.setAttribute("aria-label", "Cutscene preview");
         app.view.setAttribute("role", "img");
@@ -188,40 +318,48 @@ export async function createCutscenePreview(
 
         return {
             play() {
-                command(() => {
-                    const duration = timeline!.duration;
-                    if (duration !== null && timeline!.time >= duration)
-                        timeline!.seek(0);
-
-                    timeline!.resume();
-                    playing = true;
-                });
+                return start(false);
             },
             pause() {
+                commandVersion++;
+
                 command(() => {
+                    audio?.pause();
+
                     if (!document.hidden)
                         advance();
 
+                    audioRunning = false;
                     timeline!.pause();
                     playing = false;
                 });
             },
             replay() {
-                command(() => {
-                    timeline!.seek(0);
-                    timeline!.resume();
-                    playing = true;
-                });
+                return start(true);
             },
             seek(timeSeconds) {
+                commandVersion++;
+
                 command(() => {
                     timeline!.seek(timeSeconds);
+                    audio?.pause();
+                    audioRunning = false;
 
                     const duration = timeline!.duration;
+
                     if (duration !== null && timeline!.time >= duration)
                     {
                         timeline!.pause();
                         playing = false;
+                    }
+
+                    if (playing && audio)
+                    {
+                        audio.play(timeline!.time);
+                        audioRunning = true;
+
+                        if (document.hidden)
+                            audio.pause();
                     }
                 });
             },

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CutscenePreview, CutscenePreviewSnapshot } from "@/scene/createCutscenePreview";
+import type { CutsceneVoiceLanguage } from "@/audio/loadCutsceneAudio";
 
 import { loadCutsceneScene } from "@/data/loadCutsceneScene";
 import { createCutscenePreview } from "@/scene/createCutscenePreview";
@@ -17,11 +18,20 @@ const previewSources = {
     "loop-2": {
         catalogUrl: "data/cutscene-loop/prototype/loop-2.json",
         variant: "loop",
+    },
+    sylvia: {
+        catalogUrl: "data/cutscene/prototype/sylvia.json",
+        variant: "cutscene",
+    },
+    "sylvia-loop": {
+        catalogUrl: "data/cutscene-loop/prototype/sylvia.json",
+        variant: "loop",
     }
 } as const;
 
 const host = ref<HTMLDivElement | null>(null);
 const variant = ref<keyof typeof previewSources>("cutscene");
+const language = ref<CutsceneVoiceLanguage>("JP");
 const name = ref("Character");
 const status = ref("Closed");
 const errorMessage = ref("");
@@ -85,7 +95,7 @@ async function open() {
             state.value = snapshot;
             if (!scrubbing.value)
                 position.value = snapshot.time;
-        }, fail);
+        }, fail, language.value);
 
         if (controller !== current || current.signal.aborted)
         {
@@ -102,16 +112,38 @@ async function open() {
     }
 }
 
+async function control(action: (current: CutscenePreview) => void | Promise<void>) {
+    const current = preview;
+    if (!current)
+        return;
+
+    try
+    {
+        await action(current);
+    }
+    catch (error)
+    {
+        if (preview !== current)
+            return;
+
+        close();
+
+        status.value = "Failed";
+        errorMessage.value = error instanceof Error ? error.message : String(error);
+    }
+}
+
 function toggle() {
-    if (state.value.playing)
-        preview?.pause();
-    else
-        preview?.play();
+    void control((current) => state.value.playing ? current.pause() : current.play());
+}
+
+function replay() {
+    void control((current) => current.replay());
 }
 
 function seek() {
     scrubbing.value = false;
-    preview?.seek(position.value);
+    void control((current) => current.seek(position.value));
 }
 
 onMounted(open);
@@ -126,6 +158,17 @@ onBeforeUnmount(close);
                 <option value="cutscene">Full cutscene</option>
                 <option value="loop">Loop 1</option>
                 <option value="loop-2">Loop 2</option>
+                <option value="sylvia">Sylvia - Full cutscene</option>
+                <option value="sylvia-loop">Sylvia - Loop</option>
+            </select>
+            <select
+                v-model="language"
+                aria-label="Voice language"
+                :disabled="previewSources[variant].variant !== previewSources.cutscene.variant"
+                @change="open"
+            >
+                <option value="JP">Japanese</option>
+                <option value="KR">Korean</option>
             </select>
             <button type="button" @click="open">Reload</button>
             <button type="button" @click="close">Close</button>
@@ -137,7 +180,7 @@ onBeforeUnmount(close);
             <button type="button" :disabled="!ready" @click="toggle">
                 {{ state.playing ? "Pause" : "Play" }}
             </button>
-            <button type="button" :disabled="!ready" @click="preview?.replay()">Replay</button>
+            <button type="button" :disabled="!ready" @click="replay">Replay</button>
             <input
                 v-if="state.duration !== null"
                 v-model.number="position"
