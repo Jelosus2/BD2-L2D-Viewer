@@ -800,6 +800,15 @@ export default {
     "dating": "",
     "audio": "Char001207_BattleReady"
   },
+  "001297": {
+    "charName": "Liatris",
+    "costumeName": "Sweet Temptation",
+    "spine": "char001297",
+    "cutscene": "cutscene_char001297",
+    "dating": "",
+    "audio": "Char001297_BattleReady",
+    "displayMode": "new"
+  },
   "002401": {
     "charName": "Diana",
     "costumeName": "Adventurer of the Unknown",
@@ -1878,8 +1887,16 @@ export default {
     "spine": "char067902",
     "cutscene": "cutscene_char067902",
     "dating": "",
-    "audio": "Char067902_BattleReady",
-    "displayMode": "updated"
+    "audio": "Char067902_BattleReady"
+  },
+  "068001": {
+    "charName": "Valze",
+    "costumeName": "Night of Betrayal",
+    "spine": "char068001",
+    "cutscene": "cutscene_char068001",
+    "dating": "",
+    "audio": "Char068001_BattleReady",
+    "displayMode": "new"
   },
   "ellin": {
     "charName": "Ellin (Npc)",
