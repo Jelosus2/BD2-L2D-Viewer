@@ -1,5 +1,14 @@
 export default [
   {
+    "date": "05/11/2026",
+    "changes": [
+      "Added Valze: Night of Betrayal and Liatris: Sweet Temptation icons and voices.",
+      "Added Valze: Night of Betrayal and Liatris: Sweet Temptation standing animations.",
+      "Added Valze: Night of Betrayal and Liatris: Sweet Temptation ultimate animations.",
+      "As always, if you like my work and want to support me so I can keep working on adding more features and improving the site you can do so by donating in either my Ko-Fi or Patreon <3."
+    ]
+  },
+  {
     "date": "22/10/2026",
     "changes": [
       "Added Aquila: Sealed Desire ultimate animations.",
