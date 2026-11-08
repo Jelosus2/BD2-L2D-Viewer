@@ -11,14 +11,23 @@ export function createImageGeometry(component: Extract<SceneComponent, { kind: "
     const uvs: number[] = [];
     const indices: number[] = [];
 
-    if (![uv.x, uv.y, right, top].every((value) => value >= 0 && value <= 1))
-        throw new Error(`Image UV wrapping is not supported: ${component.id}`);
+    function validateUv(uv = component.uvRect) {
+        const values = [uv.x, uv.y, uv.x + uv.width, uv.y + uv.height];
+
+        if (!values.every(Number.isFinite) || ((slicing || media.wrapMode !== "repeat") && !values.every((value) => value >= 0 && value <= 1)))
+            throw new Error(`Unsupported image UV coordinates: ${component.id}`);
+    }
+
+    validateUv();
+
+    if (slicing && media.wrapMode === "repeat")
+        throw new Error(`Repeated sliced images are not supported: ${component.id}`);
 
     if (slicing)
     {
         const border = slicing.border;
-        const u = [0, border.left / media.width, 1 - border.right / media.width, 1];
-        const v = [0, border.top / media.height, 1 - border.bottom / media.height, 1];
+        const u = [uv.x, uv.x + border.left / media.width, right - border.right / media.width, right];
+        const v = [1 - top, 1 - top + border.top / media.height, 1 - uv.y - border.bottom / media.height, 1 - uv.y];
 
         for (const y of v)
         {
@@ -54,11 +63,33 @@ export function createImageGeometry(component: Extract<SceneComponent, { kind: "
     const buffer = geometry.getBuffer("aVertexPosition");
     buffer.static = false;
 
-    function resize(size: Vec2, pivot: Vec2) {
+    const uvBuffer = geometry.getBuffer("aTextureCoord");
+    if (!slicing)
+        uvBuffer.static = false;
+
+    function resize(size: Vec2, pivot: Vec2, uv = component.uvRect) {
         const vertices = buffer.data;
 
         if (!slicing)
         {
+            validateUv(uv);
+
+            const rightUv = uv.x + uv.width;
+            const topUv = 1 - (uv.y + uv.height);
+            const bottomUv = 1 - uv.y;
+            const coordinates = uvBuffer.data;
+
+            coordinates[0] = uv.x;
+            coordinates[1] = topUv;
+            coordinates[2] = rightUv;
+            coordinates[3] = topUv;
+            coordinates[4] = rightUv;
+            coordinates[5] = bottomUv;
+            coordinates[6] = uv.x;
+            coordinates[7] = bottomUv;
+
+            uvBuffer.update();
+
             const left = -pivot.x * size.x;
             const right = (1 - pivot.x) * size.x;
             const top = -(1 - pivot.y) * size.y;

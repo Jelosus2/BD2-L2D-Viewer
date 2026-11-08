@@ -32,7 +32,7 @@ export async function loadCutsceneMedia(scene: CutsceneScene, signal: AbortSigna
                 if (component.kind !== "spine" || media.kind !== "spine")
                     continue;
 
-                if (!media.data.findSkin(component.skin))
+                if (component.skin !== "" && !media.data.findSkin(component.skin))
                     throw new Error(`Skin not found: ${component.skin}`);
                 if (component.initialAnimation !== null && !media.data.findAnimation(component.initialAnimation))
                     throw new Error(`Animation not found: ${component.initialAnimation}`);

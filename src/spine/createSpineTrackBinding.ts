@@ -35,6 +35,7 @@ export function createSpineTrackBinding(spine: Spine, track: SpineTrack): SpineT
         return { clip, start: tick(clip.start), end: tick(clip.start + clip.duration) };
     });
 
+    const candidates = track.overlap === "animation-state" ? [...clips].reverse() : clips;
     const boundaries = Object.freeze([...new Set(clips.flatMap((clip) => [clip.start, clip.end]))].sort((a, b) => a - b).map((value) => value * 1e-12));
 
     const listener = {
@@ -115,7 +116,7 @@ export function createSpineTrackBinding(spine: Spine, track: SpineTrack): SpineT
             check();
 
             const time = tick(timeSeconds);
-            const next = clips.find((value) => time >= value.start && time < value.end)?.clip;
+            const next = candidates.find(({ clip, start, end }) => (clip.startExclusive ? time > start : time >= start) && time < end)?.clip;
 
             if (next === active)
                 return;

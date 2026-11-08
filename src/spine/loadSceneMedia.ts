@@ -2,12 +2,16 @@ import type { ImageMedia, MediaFile, SpineMedia } from "@/types/media";
 import type { SkeletonData } from "@esotericsoftware/spine-pixi";
 
 import { readAsset } from "@/data/readAsset";
-import { ALPHA_MODES, BaseTexture, Texture } from "pixi.js";
+import { ALPHA_MODES, MIPMAP_MODES, WRAP_MODES, BaseTexture, Texture } from "pixi.js";
 import { AtlasAttachmentLoader, SkeletonBinary, SpineTexture, TextureAtlas } from "@esotericsoftware/spine-pixi";
 
 export type LoadedMedia =
     | { kind: "image"; texture: Texture }
-    | { kind: "spine"; data: SkeletonData };
+    | {
+        kind: "spine";
+        data: SkeletonData;
+        multiplyTextures?: ReadonlyMap<SpineTexture, SpineTexture>;
+    };
 
 export interface SceneMedia {
     readonly items: ReadonlyMap<string, LoadedMedia>;
@@ -102,6 +106,10 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
         const atlas = new TextureAtlas(new TextDecoder().decode(atlasBytes));
         atlases.add(atlas);
 
+        const multiplyTextures = (media.multiplyBlend === "spine-ui" || media.multiplyBlend === "mobile")
+            ? new Map<SpineTexture, SpineTexture>()
+            : undefined;
+
         const names = new Set(atlas.pages.map((page) => page.name));
         if (names.size === 0 || names.size !== atlas.pages.length || names.size !== Object.keys(media.pages).length)
             throw new Error("Atlas pages do not match scene media.");
@@ -120,6 +128,18 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
 
             spineTexture.getImage = () => logicalImage;
             page.setTexture(spineTexture);
+
+            if (multiplyTextures)
+            {
+                const raw = SpineTexture.from(base(image, ALPHA_MODES.NPM));
+                images.add(raw.texture);
+
+                raw.getImage = () => logicalImage;
+                raw.setFilters(page.minFilter, page.magFilter);
+                raw.setWraps(page.uWrap, page.vWrap);
+
+                multiplyTextures.set(spineTexture, raw);
+            }
         }
 
         const parser = new SkeletonBinary(new AtlasAttachmentLoader(atlas));
@@ -135,7 +155,11 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
                 throw new Error(`Animation mix not found: ${mix.from} -> ${mix.to}`);
         }
 
-        return { kind: "spine", data };
+        return {
+            kind: "spine",
+            data,
+            ...(multiplyTextures ? { multiplyTextures } : {}),
+        };
     }
 
     signal.addEventListener("abort", dispose, { once: true });
@@ -161,7 +185,13 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
                 if (image.naturalWidth !== entry.width || image.naturalHeight !== entry.height)
                     throw new Error(`Image dimensions do not match scene media: ${entry.file.url}`);
 
-                const texture = new Texture(base(image, ALPHA_MODES.UNPACK));
+                const texture = new Texture(base(image, entry.premultiplyAlpha === "shader" ? ALPHA_MODES.NPM : ALPHA_MODES.UNPACK));
+
+                if (entry.wrapMode === "repeat")
+                    texture.baseTexture.wrapMode = WRAP_MODES.REPEAT;
+
+                if (entry.mipmap === false)
+                    texture.baseTexture.mipmap = MIPMAP_MODES.OFF;
 
                 images.add(texture);
                 items.set(id, { kind: "image", texture });

@@ -40,10 +40,30 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
         return value;
     }
 
+    const propertyPeriodSeconds = data.timeline.propertyPeriodSeconds;
+    const propertyPeriodTicks = propertyPeriodSeconds === undefined
+        ? undefined
+        : tick(propertyPeriodSeconds);
+
+    if (
+        propertyPeriodTicks !== undefined &&
+        (duration !== null || propertyPeriodTicks < 1 ||
+        data.timeline.propertyTracks.length === 0 ||
+        data.timeline.propertyTracks.some((track) => track.kind !== "scalar" || track.keys[0]?.time !== 0))
+    )
+    {
+        throw new Error("Invalid continuous property loop.");
+    }
+
     if (duration === null)
     {
-        if (data.timeline.spineTracks.length || data.timeline.activationTracks.length || data.timeline.propertyTracks.length || data.timeline.audioCues.length)
-            throw new Error("Continuous loops require an empty timeline.");
+        if (
+            data.timeline.spineTracks.length || data.timeline.activationTracks.length ||
+            data.timeline.audioCues.length || (propertyPeriodTicks === undefined && data.timeline.propertyTracks.length)
+        )
+        {
+            throw new Error("Continuous loops only support repeating scalar property tracks.");
+        }
     }
     else
     {
@@ -93,7 +113,11 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
     }
 
     function sample(value: number) {
-        properties!.evaluate(duration === null ? 0 : value);
+        const propertyTime = propertyPeriodTicks === undefined
+            ? duration === null ? 0 : value
+            : (tick(value % propertyPeriodSeconds!) % propertyPeriodTicks) * 1e-12;
+
+        properties!.evaluate(propertyTime);
 
         for (const track of tracks)
             track.evaluate(value);
@@ -160,8 +184,11 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
 
                 const spine = graph.spines.get(component.id)!;
                 spine.state.clearTracks();
-                spine.state.timeScale = 1;
-                spine.skeleton.setSkinByName(component.skin);
+                spine.state.timeScale = component.timeScale ?? 1;
+
+                if (component.skin !== "")
+                    spine.skeleton.setSkinByName(component.skin);
+
                 spine.skeleton.setToSetupPose();
                 spine.skeleton.scaleX = component.flipX ? -1 : 1;
                 spine.skeleton.scaleY = component.flipY ? -1 : 1;

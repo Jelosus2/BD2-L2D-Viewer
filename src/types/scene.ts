@@ -60,6 +60,8 @@ export type SceneComponent = {
             initialAnimation: string | null;
             initialLoop: boolean;
             startupSequence?: Array<{ animation: string; loop: boolean }>;
+            pmaVertexColors?: true;
+            timeScale?: number;
         }
         | {
             kind: "image";
@@ -78,6 +80,8 @@ export interface SceneNode {
     opacity: number;
     layout: NodeLayout;
     components: SceneComponent[];
+    inverseParentScale?: { cameraHeight: number };
+    mask?: { imageComponentId: string; showGraphic: boolean };
 }
 
 export type SpineMix =
@@ -103,12 +107,14 @@ export interface SpineClip {
     holdPrevious: boolean;
     pauseWithScene: boolean;
     thresholds: { attachment: number; event: number; drawOrder: number };
+    startExclusive?: true;
 }
 
 export interface SpineTrack {
     targetComponentId: string;
     trackIndex: number;
     clips: SpineClip[];
+    overlap?: "animation-state";
 }
 
 export interface ActivationTrack {
@@ -142,7 +148,7 @@ export type PropertyTrack =
         | {
             kind: "component";
             id: string;
-            property: `color.${"r" | "g" | "b" | "a"}`;
+            property: `color.${"r" | "g" | "b" | "a"}` | `uvRect.${"x" | "y"}`;
         };
         keys: ScalarPropertyKey[];
     }
@@ -160,6 +166,7 @@ export interface SceneTimeline {
     activationTracks: ActivationTrack[];
     propertyTracks: PropertyTrack[];
     audioCues: AudioCue[];
+    propertyPeriodSeconds?: number;
 }
 
 export interface SceneManifest {

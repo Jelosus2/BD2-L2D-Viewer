@@ -13,6 +13,7 @@ export interface SpineMedia {
     parseScale: number;
     defaultMixSeconds: number;
     mixes: Array<{ from: string; to: string; seconds: number }>;
+    multiplyBlend?: "spine-ui" | "normal" | "mobile";
 }
 
 export interface ImageMedia {
@@ -20,4 +21,7 @@ export interface ImageMedia {
     file: MediaFile;
     width: number;
     height: number;
+    mipmap?: false;
+    premultiplyAlpha?: "shader";
+    wrapMode?: "repeat";
 }

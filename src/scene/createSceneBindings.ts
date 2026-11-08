@@ -47,7 +47,17 @@ export function createSceneBindings(scene: CutsceneScene, graph: CutsceneGraph):
     function scalar(target: Extract<PropertyTrack, { kind: "scalar" }>["target"]): Property<number> {
         if (target.kind === "component")
         {
-            const color = component(target.id).color;
+            const value = component(target.id);
+
+            if (target.property === "uvRect.x" || target.property === "uvRect.y")
+            {
+                if (value.kind !== "image" || value.slicing)
+                    throw new Error("Animated UV requires an unsliced image.");
+
+                return field(value.uvRect, target.property === "uvRect.x" ? "x" : "y");
+            }
+
+            const color = value.color;
             const properties = {
                 "color.r": field(color, "r"),
                 "color.g": field(color, "g"),

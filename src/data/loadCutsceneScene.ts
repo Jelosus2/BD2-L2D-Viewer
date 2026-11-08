@@ -9,14 +9,15 @@ import type {
     SceneNode,
     SceneTimeline,
     SpineClip,
-    ImageSlicing
+    ImageSlicing,
+    SceneLayoutProfile
 } from "@/types/scene";
 import type { AudioCue, AudioMedia } from "@/types/audio";
 
 import { readAsset } from "@/data/readAsset";
 import { createPropertySampler } from "@/scene/createPropertySampler";
 
-export interface CutsceneScene extends Omit<SceneManifest, "media" | "timeline" | "layoutProfiles"> {
+export interface CutsceneScene extends Omit<SceneManifest, "media" | "timeline"> {
     media: Record<string, SpineMedia | ImageMedia | AudioMedia>;
     timeline: SceneTimeline;
 }
@@ -56,7 +57,6 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
     const scene = object(value);
     check(scene.schemaVersion === 1 && scene.revision === revision, "scene schema/revision mismatch");
     check(scene.variant === (isLoop ? "cutscene-loop-prototype" : "cutscene-prototype"), "unsupported scene variant");
-    check(scene.layoutProfiles === undefined, "layout profiles are not supported yet");
 
     const rawLayout = object(scene.layout);
     const rootMode = choice(rawLayout.rootMode, ["authored", "stretch-to-host"]);
@@ -94,19 +94,30 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
         const layout = parseLayout(raw.layout);
         const entries = array(raw.components).map((value): SceneComponent => {
             const component = parseComponent(value);
+            check(component.kind !== "spine" || component.timeScale === undefined || isLoop, "per-instance Spine time scale requires a loop");
             check(layout.kind === "rect", "visual component requires a RectTransform");
             check(!components.has(component.id), "duplicate component ID");
 
             const asset = media.get(component.mediaId);
             check(asset?.kind === component.kind, "missing or incompatible component media");
+            check(component.kind !== "image" || asset?.kind !== "image" ||
+                asset.premultiplyAlpha !== "shader" || component.blendMode === "normal",
+                "shader-premultiplied image requires normal blending");
+
+            check(component.kind !== "image" || asset?.kind !== "image" ||
+                asset.wrapMode !== "repeat" || !component.slicing,
+                "repeat sampling requires an unsliced image");
 
             if (component.kind === "image" && component.slicing && asset?.kind === "image")
             {
                 const { left, bottom, right, top } = component.slicing.border;
                 const uv = component.uvRect;
 
-                check(uv.x === 0 && uv.y === 0 && uv.width === 1 && uv.height === 1, "sliced images require a full texture");
-                check(left + right <= asset.width && bottom + top <= asset.height && left + bottom + right + top > 0, "invalid sliced image borders");
+                check(uv.width > 0 && uv.height > 0 && [uv.x, uv.y, uv.x + uv.width, uv.y + uv.height].every((value) => value >= 0 && value <= 1),
+                    "sliced image region exceeds its texture");
+
+                check(left + right <= uv.width * asset.width && bottom + top <= uv.height * asset.height && left + bottom + right + top > 0,
+                    "invalid sliced image borders");
             }
 
             components.set(component.id, component);
@@ -124,11 +135,39 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
             0,
             1),
             layout,
-            components: entries
+            components: entries,
+            ...(raw.mask === undefined ? {} : { mask: {
+                imageComponentId: text(object(raw.mask).imageComponentId),
+                showGraphic: boolean(object(raw.mask).showGraphic)
+            } }),
+            ...(raw.inverseParentScale === undefined ? {} : {
+                inverseParentScale: {
+                    cameraHeight: number(object(raw.inverseParentScale).cameraHeight, Number.MIN_VALUE)
+                }
+            })
         };
     });
 
     check(nodes.length > 0 && nodes[0].layout.kind === "rect", "missing authored root rectangle");
+
+    const maskDepths = new Map<string, number>();
+
+    for (const node of nodes)
+    {
+        const depth = (node.parentId === null ? 0 : maskDepths.get(node.parentId)!) + (node.mask ? 1 : 0);
+        check(depth <= 8, "mask nesting exceeds native stencil depth");
+
+        maskDepths.set(node.id, depth);
+
+        if (!node.mask)
+            continue;
+
+        const image = node.components.find((component) => component.id === node.mask!.imageComponentId);
+        const asset = image && media.get(image.mediaId);
+
+        check(image?.kind === "image" && image.enabled && image.blendMode === "normal" && asset?.kind === "image" && asset.premultiplyAlpha !== "shader",
+            "invalid mask image");
+    }
 
     if (rootMode === "stretch-to-host")
     {
@@ -159,22 +198,61 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
         check(!spineTargets.has(target), "duplicate Spine track");
 
         spineTargets.add(target);
-        let previousEnd = 0;
+
+        const overlap = track.overlap === undefined
+            ? undefined
+            : choice(track.overlap, ["animation-state"]);
+
+        check(!isLoop || overlap === undefined, "overlapping tracks require a full cutscene");
 
         const clips = array(track.clips).map((value) => {
             const clip = parseClip(value);
             check(!clipIds.has(clip.id), "duplicate clip ID");
+            check(overlap !== undefined || clip.startExclusive === undefined, "exclusive start requires an overlap policy");
 
             clipIds.add(clip.id);
-            check(clip.start >= previousEnd, "unordered or overlapping Spine clips");
-
-            previousEnd = number(clip.start + clip.duration);
+            number(clip.start + clip.duration);
             number(clip.clipIn + clip.duration * clip.speed);
 
             return clip;
         });
 
-        return { targetComponentId, trackIndex, clips };
+        const tick = (value: number) => integer(Math.trunc(value / 1e-12 + 0.5));
+
+        if (overlap === undefined)
+        {
+            let previousEnd = 0;
+
+            for (const clip of clips)
+            {
+                check(tick(clip.start) >= tick(previousEnd), "unordered or overlapping Spine clips");
+                previousEnd = clip.start + clip.duration;
+            }
+        }
+        else
+        {
+            const times = clips.map((clip) => ({
+                start: tick(clip.start),
+                end: tick(clip.start + clip.duration)
+            }));
+
+            times.forEach((time, index) => {
+                check(time.end > time.start && (index === 0 || (time.start > times[index - 1].start && time.end > times[index - 1].end)),
+                    "simultaneous starts or nested clip ends");
+
+                check(index < 2 || time.start >= times[index - 2].end, "more than two overlapping clips");
+                number(clips[index].speed, 0.001, 1000);
+            });
+
+            check(times.some((time, index) => index > 0 && time.start < times[index - 1].end), "overlap policy requires overlapping clips");
+        }
+
+        return {
+            targetComponentId,
+            trackIndex,
+            clips,
+            ...(overlap ? { overlap } : {})
+        };
     });
 
     const activationTargets = new Set<string>();
@@ -264,7 +342,20 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
                 track = { kind, target: { kind: "node", id, property }, keys };
             }
             else
-                track = { kind, target: { kind: "component", id, property: choice(target.property, ["color.r", "color.g", "color.b", "color.a"]) }, keys };
+            {
+                const property = choice(target.property, ["color.r", "color.g", "color.b", "color.a", "uvRect.x", "uvRect.y"]);
+
+                if (property.startsWith("uvRect."))
+                {
+                    const component = components.get(id)!;
+                    const asset = media.get(component.mediaId);
+
+                    check(component.kind === "image" && !component.slicing && asset?.kind === "image" && asset.wrapMode === "repeat",
+                        "animated UV requires an unsliced repeating image");
+                }
+
+                track = { kind, target: { kind: "component", id, property }, keys };
+            }
         }
 
         const address = JSON.stringify(track.target);
@@ -315,11 +406,25 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
 
     check(usedMedia.size === media.size, "unreferenced media");
 
+    const propertyPeriodSeconds = timeline.propertyPeriodSeconds === undefined
+        ? undefined
+        : number(timeline.propertyPeriodSeconds, 1e-12);
+
+    check(propertyPeriodSeconds === undefined || (isLoop && Number.isSafeInteger(Math.trunc(propertyPeriodSeconds / 1e-12 + 0.5))),
+        "invalid property repeat period");
+
     let durationSeconds: number | null = null;
     if (isLoop)
     {
-        check(timeline.durationSeconds === null && spineTracks.length === 0 && activationTracks.length === 0 && propertyTracks.length === 0 && audioCues.length === 0,
-            "loop requires a static scene with no timeline tracks");
+        check(timeline.durationSeconds === null && spineTracks.length === 0 &&
+            activationTracks.length === 0 && audioCues.length === 0,
+            "loop contains unsupported timeline tracks");
+
+        check(propertyPeriodSeconds === undefined
+            ? propertyTracks.length === 0
+            : propertyTracks.length > 0 && propertyTracks.every((track) => track.kind === "scalar" && track.keys[0].time === 0),
+            "loop requires scalar properties and a repeat period");
+
         check(nodes.every((node) => node.active), "loop contains inactive nodes");
 
         const spines = [...components.values()].filter((component) => component.kind === "spine" && component.enabled);
@@ -330,6 +435,72 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
     {
         durationSeconds = number(timeline.durationSeconds, Number.MIN_VALUE);
         check(audioCues.every((cue) => cue.start <= durationSeconds!), "audio cue starts after scene end");
+    }
+
+    const profileIds = new Set<string>();
+    const orientations = new Set<string>();
+    let profileNodes: string | undefined;
+
+    const layoutProfiles = scene.layoutProfiles === undefined
+        ? undefined
+        : array(scene.layoutProfiles).map((value): SceneLayoutProfile => {
+            const profile = object(value);
+            const id = text(profile.id);
+            const orientation = choice(profile.orientation, ["portrait", "landscape"]);
+            check(!profileIds.has(id) && !orientations.has(orientation), "duplicate layout profile");
+
+            profileIds.add(id);
+            orientations.add(orientation);
+
+            const referenceSize = vector(profile.referenceSize, Number.MIN_VALUE);
+            const expected = orientation === "portrait"
+                ? vector(rawLayout.referenceSize, Number.MIN_VALUE)
+                : landscapeReferenceSize ?? vector(rawLayout.referenceSize, Number.MIN_VALUE);
+
+            check(referenceSize.x === expected.x && referenceSize.y === expected.y, "profile reference differs from canvas");
+
+            const entries = Object.entries(object(profile.nodeLayouts));
+            check(entries.length > 0, "empty profile overrides");
+
+            const keys = JSON.stringify(entries.map(([nodeId]) => nodeId).sort());
+            profileNodes ??= keys;
+
+            check(keys === profileNodes, "profile node mismatch");
+
+            const nodeLayouts = Object.fromEntries(entries.map(([nodeId, value]) => {
+                const layout = parseLayout(value);
+                check(nodeId !== nodes[0].id && byId.get(nodeId)?.layout.kind === "rect" && layout.kind === "rect", "unknown profile node, loaded-root override or incompatible layout");
+
+                return [nodeId, layout];
+            }));
+
+            return { id, orientation, referenceSize, nodeLayouts };
+        });
+
+    check(layoutProfiles === undefined || layoutProfiles.length === 2, "expected both layout orientations");
+    check(!layoutProfiles?.some((profile) => propertyTracks.some((track) =>
+        track.target.kind === "node" && track.target.property.startsWith("layout.") &&
+        Object.prototype.hasOwnProperty.call(profile.nodeLayouts, track.target.id))),
+        "layout profile overrides animated layout");
+
+    for (const node of nodes.filter((node) => node.inverseParentScale !== undefined))
+    {
+        check(rootMode === "stretch-to-host" && node.parentId !== null && node.layout.kind === "rect", "inverse scale requires a native child rectangle");
+        check(!propertyTracks.some((track) => track.target.kind === "node" && track.target.id === node.id &&
+            track.target.property.startsWith("layout.scale.")), "inverse scale target is animated");
+
+        let parentId: string | null = node.parentId;
+
+        while (parentId !== null)
+        {
+            const parent: SceneNode = byId.get(parentId)!;
+            check(parent.inverseParentScale === undefined, "nested inverse scales");
+
+            for (const layout of [parent.layout, ...(layoutProfiles ?? []).map((profile) => profile.nodeLayouts[parentId!]).filter(Boolean)])
+                check(layout.scale.x === layout.scale.y && layout.scale.x > 0, "inverse scale requires uniform positive parents");
+
+            parentId = parent.parentId;
+        }
     }
 
     const coverage = object(scene.coverage);
@@ -347,9 +518,12 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
             referencePixelsPerUnit: number(rawLayout.referencePixelsPerUnit, Number.MIN_VALUE),
             screenMatch: { mode }
         },
-        media: Object.fromEntries(media), nodes,
+        ...(layoutProfiles === undefined ? {} : { layoutProfiles }),
+        media: Object.fromEntries(media),
+        nodes,
         timeline: {
             durationSeconds,
+            ...(propertyPeriodSeconds === undefined ? {} : { propertyPeriodSeconds }),
             spineTracks,
             activationTracks,
             propertyTracks,
@@ -371,16 +545,15 @@ function parseLayout(value: unknown): NodeLayout {
 
     check(entry.kind === "rect", "unknown node layout");
 
-    const anchorMin = vector(entry.anchorMin, 0, 1);
-    const anchorMax = vector(entry.anchorMax, 0, 1);
-    check(anchorMin.x <= anchorMax.x && anchorMin.y <= anchorMax.y, "reversed anchors");
+    const anchorMin = vector(entry.anchorMin);
+    const anchorMax = vector(entry.anchorMax);
 
     return {
         ...common,
         kind: "rect",
         anchorMin,
         anchorMax,
-        pivot: vector(entry.pivot, 0, 1),
+        pivot: vector(entry.pivot),
         anchoredPosition: vector(entry.anchoredPosition),
         sizeDelta: vector(entry.sizeDelta)
     };
@@ -410,16 +583,19 @@ function parseComponent(value: unknown): SceneComponent {
     }
 
     check(entry.kind === "spine" && entry.startupSequence === undefined, "unsupported component/startup sequence");
+    check(entry.pmaVertexColors === undefined || entry.pmaVertexColors === true, "unsupported Spine vertex color policy");
 
     return {
         ...common,
         kind: "spine",
-        skin: text(entry.skin),
+        skin: entry.skin === "" ? "" : text(entry.skin),
         flipX: boolean(entry.flipX),
         flipY: boolean(entry.flipY),
         renderScale: number(entry.renderScale, Number.MIN_VALUE),
         initialAnimation: entry.initialAnimation === null ? null : text(entry.initialAnimation),
-        initialLoop: boolean(entry.initialLoop)
+        initialLoop: boolean(entry.initialLoop),
+        ...(entry.timeScale === undefined ? {} : { timeScale: number(entry.timeScale, 0.001, 1000) }),
+        ...(entry.pmaVertexColors === true ? { pmaVertexColors: true as const } : {})
     };
 }
 
@@ -441,8 +617,27 @@ function parseImageSlicing(value: unknown): ImageSlicing {
 
 function parseMedia(value: unknown): SpineMedia | ImageMedia | AudioMedia {
     const entry = object(value);
+
     if (entry.kind === "image")
-        return { kind: "image", file: file(entry.file), width: integer(entry.width, 1), height: integer(entry.height, 1) };
+    {
+        check(entry.wrapMode === undefined || entry.wrapMode === "repeat", "unsupported image wrap mode");
+
+        const width = integer(entry.width, 1), height = integer(entry.height, 1);
+        check(entry.wrapMode !== "repeat" || [width, height].every((value) => Number.isInteger(Math.log2(value))), "repeat image dimensions must be powers of two");
+
+        check(entry.mipmap === undefined || entry.mipmap === false, "unsupported image mipmap policy");
+        check(entry.premultiplyAlpha === undefined || entry.premultiplyAlpha === "shader", "unsupported image alpha policy");
+
+        return {
+            kind: "image",
+            file: file(entry.file),
+            width,
+            height,
+            ...(entry.wrapMode === "repeat" ? { wrapMode: "repeat" as const } : {}),
+            ...(entry.mipmap === false ? { mipmap: false as const } : {}),
+            ...(entry.premultiplyAlpha === "shader" ? { premultiplyAlpha: "shader" as const } : {})
+        };
+    }
 
     if (entry.kind === "audio")
         return parseAudioMedia(entry);
@@ -459,6 +654,9 @@ function parseMedia(value: unknown): SpineMedia | ImageMedia | AudioMedia {
         skeleton: file(entry.skeleton),
         atlas: file(entry.atlas),
         pages: Object.fromEntries(pages.map(([name, value]) => [name, file(value)])),
+        ...(entry.multiplyBlend === undefined ? {} : {
+            multiplyBlend: choice(entry.multiplyBlend, ["spine-ui", "normal", "mobile"]),
+        }),
         parseScale: number(entry.parseScale, Number.MIN_VALUE), defaultMixSeconds: number(entry.defaultMixSeconds, 0),
         mixes: array(entry.mixes).map((value) => {
             const mix = object(value);
@@ -502,11 +700,13 @@ function parseClip(value: unknown): SpineClip {
     const entry = object(value), mix = object(entry.mix), end = object(entry.end), thresholds = object(entry.thresholds);
     const mixMode = choice(mix.mode, ["skeleton-default", "explicit"]);
     const endMode = choice(end.mode, ["continue", "freeze", "mix-out"]);
+    check(entry.startExclusive === undefined || entry.startExclusive === true, "invalid exclusive clip start");
 
     return {
         id: text(entry.id),
         animation: text(entry.animation),
         start: number(entry.start, 0),
+        ...(entry.startExclusive === true ? { startExclusive: true as const } : {}),
         duration: number(entry.duration, Number.MIN_VALUE),
         clipIn: number(entry.clipIn, 0),
         speed: number(entry.speed, Number.MIN_VALUE),

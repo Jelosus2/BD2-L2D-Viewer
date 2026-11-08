@@ -6,7 +6,10 @@ import { resolveRectLayout } from "./resolveRectLayout";
 import { createImageGeometry } from "@/scene/createImageGeometry";
 import { SceneSpine } from "./SceneSpine";
 import { SceneSlotMesh } from "./SceneSlotMesh";
-import { BLEND_MODES, Container, Mesh, MeshMaterial, extensions } from "pixi.js";
+import { MobileMultiplySlotMesh } from "./MobileMultiplySlotMesh";
+import { SpriteDefaultImageMaterial } from "./SpriteDefaultImageMaterial";
+import { AlphaClipImageMaterial } from "./AlphaClipImageMaterial";
+import { BLEND_MODES, MASK_TYPES, MaskData, Container, Mesh, MeshMaterial, extensions } from "pixi.js";
 import { DarkTintRenderer } from "@esotericsoftware/spine-pixi";
 
 export interface CutsceneGraph {
@@ -29,7 +32,8 @@ export function createCutsceneGraph(scene: CutsceneScene, resources: SceneMedia)
     const spines = new Map<string, SceneSpine>();
     const images = new Map<string, {
         mesh: Mesh;
-        resize(size: Vec2, pivot: Vec2): void;
+        mask?: Mesh;
+        resize(size: Vec2, pivot: Vec2, uv: Extract<SceneComponent, { kind: "image" }>["uvRect"]): void;
     }>();
 
     let hostSize = { ...scene.layout.referenceSize };
@@ -64,16 +68,27 @@ export function createCutsceneGraph(scene: CutsceneScene, resources: SceneMedia)
         image.mesh.visible = component.enabled;
         image.mesh.alpha = a;
         image.mesh.tint = [r, g, b];
-        image.resize(size, pivot);
+
+        if (image.mask)
+        {
+            image.mask.visible = component.enabled;
+            image.mask.alpha = a;
+        }
+
+        image.resize(size, pivot, component.uvRect);
     }
 
     function refresh() {
         if (disposed)
             throw new Error("Cutscene graph has been disposed.");
 
+        const orientation = hostSize.x >= hostSize.y ? "landscape" : "portrait";
+        const layouts = scene.layoutProfiles?.find((profile) => profile.orientation === orientation)?.nodeLayouts;
+        const worldScales = new Map<string, Vec2>();
+
         for (const node of nodes.values())
         {
-            const layout = node.layout;
+            const layout = layouts?.[node.id] ?? node.layout;
             const container = containers.get(node.id)!;
             let size = { x: 0, y: 0 };
             let position: Vec2;
@@ -81,13 +96,17 @@ export function createCutsceneGraph(scene: CutsceneScene, resources: SceneMedia)
             if (layout.kind === "rect")
             {
                 const parent = node.parentId === null ? undefined : nodes.get(node.parentId);
+                const parentLayout = parent ? layouts?.[parent.id] ?? parent.layout : undefined;
                 const parentSize = node.parentId === null && scene.layout.rootMode === "stretch-to-host"
                     ? hostSize
-                    : parent?.layout.kind === "rect"
+                    : parent && parentLayout?.kind === "rect"
                         ? sizes.get(parent.id)!
                         : { x: 0, y: 0 };
 
-                const parentPivot = parent?.layout.kind === "rect" ? parent.layout.pivot : { x: 0.5, y: 0.5 };
+                const parentPivot = parentLayout?.kind === "rect"
+                    ? parentLayout.pivot
+                    : { x: 0.5, y: 0.5 };
+
                 const resolved = resolveRectLayout(layout, parentSize, parentPivot);
 
                 size = resolved.size;
@@ -101,7 +120,35 @@ export function createCutsceneGraph(scene: CutsceneScene, resources: SceneMedia)
             sizes.set(node.id, size);
 
             container.position.set(position.x, -position.y);
-            container.scale.set(layout.scale.x, layout.scale.y);
+
+            const parentScale = node.parentId === null
+                ? { x: 1, y: 1 }
+                : worldScales.get(node.parentId)!;
+
+            let scale = layout.scale;
+
+            if (node.inverseParentScale)
+            {
+                if (!Number.isFinite(parentScale.x) || parentScale.x <= 0 || parentScale.x !== parentScale.y)
+                    throw new Error("Inverse scale requires a uniform positive parent scale.");
+
+                const pixelsPerWorldUnit = hostSize.y / node.inverseParentScale.cameraHeight;
+
+                scale = {
+                    x: pixelsPerWorldUnit / parentScale.x,
+                    y: pixelsPerWorldUnit / parentScale.y
+                };
+
+                if (!Number.isFinite(scale.x) || !Number.isFinite(scale.y))
+                    throw new Error("Inverse scale exceeds the supported range.");
+            }
+
+            worldScales.set(node.id, {
+                x: parentScale.x * scale.x,
+                y: parentScale.y * scale.y
+            });
+
+            container.scale.set(scale.x, scale.y);
             container.rotation = -layout.rotationDegrees * Math.PI / 180;
             container.alpha = node.opacity;
             container.visible = node.active;
@@ -152,7 +199,9 @@ export function createCutsceneGraph(scene: CutsceneScene, resources: SceneMedia)
 
                     const spine = new SceneSpine(media.data, {
                         autoUpdate: false,
-                        slotMeshFactory: () => new SceneSlotMesh(),
+                        slotMeshFactory: () => settings.multiplyBlend === "mobile"
+                            ? new MobileMultiplySlotMesh(media.multiplyTextures)
+                            : new SceneSlotMesh(media.multiplyTextures, settings.multiplyBlend === "normal", component.pmaVertexColors === true)
                     });
 
                     container.addChild(spine);
@@ -160,10 +209,14 @@ export function createCutsceneGraph(scene: CutsceneScene, resources: SceneMedia)
 
                     spine.zIndex = -1;
                     spine.scale.set(scene.layout.referencePixelsPerUnit * component.renderScale);
-                    spine.skeleton.setSkinByName(component.skin);
+
+                    if (component.skin !== "")
+                        spine.skeleton.setSkinByName(component.skin);
+
                     spine.skeleton.setSlotsToSetupPose();
                     spine.skeleton.scaleX = component.flipX ? -1 : 1;
                     spine.skeleton.scaleY = component.flipY ? -1 : 1;
+                    spine.state.timeScale = component.timeScale ?? 1;
                     spine.state.data.defaultMix = settings.defaultMixSeconds;
 
                     for (const mix of settings.mixes)
@@ -182,10 +235,30 @@ export function createCutsceneGraph(scene: CutsceneScene, resources: SceneMedia)
                         throw new Error(`Missing image settings: ${component.id}`);
 
                     const prepared = createImageGeometry(component, settings, scene.layout.referencePixelsPerUnit);
-                    const image = new Mesh(prepared.geometry, new MeshMaterial(media.texture));
+                    const mask = node.mask?.imageComponentId === component.id ? node.mask : undefined;
+                    const material = mask ? new AlphaClipImageMaterial(media.texture) : settings.premultiplyAlpha === "shader"
+                        ? new SpriteDefaultImageMaterial(media.texture)
+                        : new MeshMaterial(media.texture);
 
+                    const image = new Mesh(prepared.geometry, material);
                     container.addChild(image);
-                    images.set(component.id, { mesh: image, resize: prepared.resize });
+
+                    let maskMesh: Mesh | undefined;
+
+                    if (mask)
+                    {
+                        maskMesh = new Mesh(prepared.geometry, new AlphaClipImageMaterial(media.texture));
+                        container.addChild(maskMesh);
+
+                        const data = new MaskData(maskMesh);
+                        data.type = MASK_TYPES.STENCIL;
+                        data.autoDetect = false;
+
+                        container.mask = data;
+                        image.renderable = mask.showGraphic;
+                    }
+
+                    images.set(component.id, { mesh: image, mask: maskMesh, resize: prepared.resize });
 
                     image.zIndex = -1;
                     image.blendMode = {
