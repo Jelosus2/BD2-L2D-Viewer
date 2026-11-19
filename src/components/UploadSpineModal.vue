@@ -8,7 +8,7 @@
       <h2 class="text-lg font-bold mb-2">Upload Spine Files</h2>
       <p class="mb-2">
         Select your <strong>.atlas</strong>, <strong>.skel</strong> or <strong>.json</strong> and related <strong>.png</strong> files.
-        Only Spine 4.1 files are supported.
+        Spine 4.1 and 4.2 files are supported. The version is detected automatically.
       </p>
       <input
         v-model="name"

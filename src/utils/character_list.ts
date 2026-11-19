@@ -806,8 +806,7 @@ export default {
     "spine": "char001297",
     "cutscene": "cutscene_char001297",
     "dating": "",
-    "audio": "Char001297_BattleReady",
-    "displayMode": "new"
+    "audio": "Char001297_BattleReady"
   },
   "002401": {
     "charName": "Diana",
@@ -1736,6 +1735,15 @@ export default {
     "dating": "",
     "audio": "Char067202_BattleReady"
   },
+  "067203": {
+    "charName": "Venaka",
+    "costumeName": "Cheers to Victory",
+    "spine": "char067203",
+    "cutscene": "cutscene_char067203",
+    "dating": "",
+    "audio": "Char067203_BattleReady",
+    "displayMode": "new"
+  },
   "067301": {
     "charName": "Levia",
     "costumeName": "Track and Field Captain",
@@ -1895,8 +1903,7 @@ export default {
     "spine": "char068001",
     "cutscene": "cutscene_char068001",
     "dating": "",
-    "audio": "Char068001_BattleReady",
-    "displayMode": "new"
+    "audio": "Char068001_BattleReady"
   },
   "ellin": {
     "charName": "Ellin (Npc)",

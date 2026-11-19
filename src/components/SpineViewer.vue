@@ -87,6 +87,9 @@
         />
       </div>
       <div ref="container" class="absolute inset-0 z-10" @pointerdown="onViewerPointerDown"></div>
+      <div v-if="loadError" role="alert" class="absolute inset-0 z-30 flex items-center justify-center p-6 text-center text-red-300 bg-gray-900/90">
+        {{ loadError }}
+      </div>
       <canvas ref="overlayCanvas" class="absolute inset-0 z-20 pointer-events-none"></canvas>
     </div>
     <div
@@ -112,25 +115,19 @@
 import { ref, reactive, watch, onMounted, onBeforeUnmount, computed, type CSSProperties } from 'vue'
 import { useCharacterStore } from '@/stores/characterStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import {
+import type {
   SpinePlayer,
-  Vector2,
-  CameraController,
+  SpinePlayerConfig,
   OrthoCamera,
   GLTexture,
   AnimationState,
-  AnimationStateData,
   AssetManager,
-  AtlasAttachmentLoader,
-  Skeleton,
-  SkeletonBinary,
   TrackEntry,
-  MeshAttachment,
-  RegionAttachment,
-  type VertexAttachment,
-  type SkeletonData,
-  type Skeleton as SpineSkeleton,
+  VertexAttachment,
+  SkeletonData,
+  Skeleton as SpineSkeleton,
 } from '@esotericsoftware/spine-player'
+import { createSkeletonDownloader, loadSpineRuntime, readBinarySpineVersion, readJsonSpineVersion, spine41Runtime } from '@/utils/spineRuntime'
 import { Output, WebMOutputFormat, BufferTarget, CanvasSource, Quality, canEncodeVideo } from 'mediabunny'
 import JSZip from 'jszip'
 
@@ -211,6 +208,7 @@ const backgroundImageEl = ref<HTMLImageElement | null>(null)
 const overlayCanvas = ref<HTMLCanvasElement | null>(null)
 
 const progress = ref(0)
+const loadError = ref('')
 const store = useCharacterStore()
 const settingsStore = useSettingsStore()
 
@@ -311,13 +309,17 @@ const editButtonClasses = computed(() => [
 ])
 
 let player: SpinePlayer | null = null
+let runtime = spine41Runtime
+let loadToken = 0
+let loadAbortController: AbortController | null = null
 let cancelExport = false
 let exportingFrames = false
 let manualCamera: OrthoCamera | null = null
-let defaultCameraPos = new Vector2()
+let defaultCameraPos = new runtime.classes.Vector2()
 let defaultZoom = 0
 const previousLayerVisibility = new Map<string, boolean>()
 let overlayInstances: CompositeOverlayInstance[] = []
+const compositePoseHistory = new WeakMap<SpineSkeleton, { time: number; segment: CompositeSegment }>()
 let overlayRenderHandle: number | null = null
 let overlayLastTimestamp: number | null = null
 let forceTransparentClear = false
@@ -328,8 +330,8 @@ const MIN_ZOOM_FACTOR = 0.08
 const MAX_ZOOM_FACTOR = 4
 const ZOOM_STEP_FACTOR = 1.2
 
-let offset = new Vector2()
-let size = new Vector2()
+let offset = new runtime.classes.Vector2()
+let size = new runtime.classes.Vector2()
 
 const DEFAULT_COMPOSITE_NAME = 'all'
 const resolvedCompositeCache = new WeakMap<CutsceneComposite, CompiledComposite>()
@@ -354,7 +356,7 @@ type PatchedGLTexturePrototype = typeof GLTexture.prototype & {
 }
 
 function ensureGLTexturePremultiplyPatch() {
-  const proto = GLTexture.prototype as PatchedGLTexturePrototype
+  const proto = runtime.classes.GLTexture.prototype as PatchedGLTexturePrototype
   if (proto[glTexturePatchedKey]) return
   const originalUpdate = proto.update
   proto[glTextureOriginalKey] = originalUpdate
@@ -411,7 +413,7 @@ function setSpineAnimation(
       state.clearTrack(1)
 
       p.skeleton?.setToSetupPose()
-      p.skeleton?.updateWorldTransform()
+      runtime.updateWorldTransform(p.skeleton)
 
       const idleEntry = state.setAnimation(0, idleName, true)
       const mixEntry = state.setAnimation(1, animationName, options.loop)
@@ -436,7 +438,7 @@ function setSpineAnimation(
     state.clearTrack(1)
 
     p.skeleton?.setToSetupPose()
-    p.skeleton?.updateWorldTransform()
+    runtime.updateWorldTransform(p.skeleton)
   } else {
     state.clearTrack(1)
   }
@@ -735,19 +737,31 @@ async function getExternalSkeletonAsset(source: string): Promise<ExternalSkeleto
 
   const assetPromise = (async () => {
     if (!player?.context) throw new Error('Spine player is not ready.')
+    const currentPlayer = player
+    const currentRuntime = runtime
     const basePath = resolveExternalSkeletonBasePath(normalized)
     const binaryUrl = `${basePath}.skel`
     const atlasUrl = `${basePath}.atlas`
-    const assetManager = new AssetManager(player.context, '')
-    assetManager.loadBinary(binaryUrl)
-    assetManager.loadTextureAtlas(atlasUrl)
-    await assetManager.loadAll()
+    const assetManager = new runtime.classes.AssetManager(player.context, '')
+    try {
+      assetManager.loadBinary(binaryUrl)
+      assetManager.loadTextureAtlas(atlasUrl)
+      await assetManager.loadAll()
+      if (player !== currentPlayer) throw new Error('Composite loading was cancelled.')
 
-    const atlas = assetManager.require(atlasUrl)
-    const binaryData = assetManager.require(binaryUrl)
-    const binary = new SkeletonBinary(new AtlasAttachmentLoader(atlas))
-    const skeletonData = binary.readSkeletonData(binaryData)
-    return { source: normalized, skeletonData, assetManager }
+      const atlas = assetManager.require(atlasUrl)
+      const binaryData = assetManager.require(binaryUrl) as Uint8Array
+      const version = readBinarySpineVersion(binaryData)
+      if (version !== currentRuntime.version) {
+        throw new Error(`Composite skeleton ${source} uses Spine ${version}, but the base skeleton uses ${currentRuntime.version}.`)
+      }
+      const binary = new currentRuntime.classes.SkeletonBinary(new currentRuntime.classes.AtlasAttachmentLoader(atlas))
+      const skeletonData = binary.readSkeletonData(binaryData)
+      return { source: normalized, skeletonData, assetManager }
+    } catch (error) {
+      assetManager.dispose()
+      throw error
+    }
   })()
 
   externalSkeletonCache.set(normalized, assetPromise)
@@ -880,11 +894,12 @@ function applySegmentsToState(
   segments: CompositeSegment[],
   time: number,
   hideWhenOutOfRange = false,
+  resetPhysics = false,
 ) {
   state.clearTracks()
   skeleton.setToSetupPose()
   skeleton.setSlotsToSetupPose()
-  skeleton.updateWorldTransform()
+  runtime.updateWorldTransform(skeleton)
   if (!segments.length) return
 
   segments.sort((a, b) => a.start - b.start)
@@ -927,7 +942,11 @@ function applySegmentsToState(
   }
 
   state.apply(skeleton)
-  skeleton.updateWorldTransform()
+  const previousPose = compositePoseHistory.get(skeleton)
+  const shouldResetPhysics = resetPhysics || !previousPose || time < previousPose.time || previousPose.segment !== current
+  runtime.setSkeletonTime(skeleton, time)
+  runtime.updateWorldTransform(skeleton, shouldResetPhysics)
+  compositePoseHistory.set(skeleton, { time, segment: current })
 }
 
 function overlayActiveAt(segments: CompositeSegment[], time: number): boolean {
@@ -947,7 +966,7 @@ function createOverlayInstance(
   externalAsset?: ExternalSkeletonAsset,
 ) {
   const skeletonData = externalAsset?.skeletonData ?? baseSkeleton.data
-  const skeleton = new Skeleton(skeletonData)
+  const skeleton = new runtime.classes.Skeleton(skeletonData)
   skeleton.scaleX = baseSkeleton.scaleX
   skeleton.scaleY = baseSkeleton.scaleY
   skeleton.x = baseSkeleton.x
@@ -960,8 +979,8 @@ function createOverlayInstance(
     skeleton.setSkin(baseSkeleton.skin)
     skeleton.setSlotsToSetupPose()
   }
-  const stateData = new AnimationStateData(externalAsset?.skeletonData ?? baseState.data.skeletonData)
-  const state = new AnimationState(stateData)
+  const stateData = new runtime.classes.AnimationStateData(externalAsset?.skeletonData ?? baseState.data.skeletonData)
+  const state = new runtime.classes.AnimationState(stateData)
   applySegmentsToState(state, skeleton, segments, time, true)
   return { trackIndex, skeleton, state, segments, source }
 }
@@ -1086,9 +1105,10 @@ function renderCompositeFrame(timestamp?: number) {
   }
 
   if (store.playing && speed > 0) {
+    runtime.advanceSkeleton(player.skeleton, delta * speed)
     player.animationState.update(delta * speed)
     player.animationState.apply(player.skeleton)
-    player.skeleton.updateWorldTransform()
+    runtime.updateWorldTransform(player.skeleton)
     applyLayerVisibility(player.skeleton)
     const { time, hasTracks } = currentCompositeTime(player)
     compositeElapsed = hasTracks ? time : compositeElapsed + delta * speed
@@ -1102,7 +1122,7 @@ function renderCompositeFrame(timestamp?: number) {
     }
   } else {
     player.animationState.apply(player.skeleton)
-    player.skeleton.updateWorldTransform()
+    runtime.updateWorldTransform(player.skeleton)
     applyLayerVisibility(player.skeleton)
     const { time, hasTracks } = currentCompositeTime(player)
     if (hasTracks) {
@@ -1123,7 +1143,7 @@ function renderCompositeFrame(timestamp?: number) {
     const current = overlay.state.getCurrent(0)
     if (!current || !current.animation) {
       overlay.skeleton.setToSetupPose()
-      overlay.skeleton.updateWorldTransform()
+      runtime.updateWorldTransform(overlay.skeleton)
       return
     }
     renderer.drawSkeleton(overlay.skeleton, premultiplied)
@@ -1145,9 +1165,10 @@ function renderCompositeFrame(timestamp?: number) {
 function advanceCompositeStates(deltaSeconds: number) {
   if (!player || !player.skeleton || !player.animationState) return
   const speed = player.speed || store.animationSpeed || 1
+  runtime.advanceSkeleton(player.skeleton, deltaSeconds * speed)
   player.animationState.update(deltaSeconds * speed)
   player.animationState.apply(player.skeleton)
-  player.skeleton.updateWorldTransform()
+  runtime.updateWorldTransform(player.skeleton)
   const { time, hasTracks } = currentCompositeTime(player)
   compositeElapsed = hasTracks ? time : compositeElapsed + deltaSeconds * speed
   overlayInstances.forEach(overlay => {
@@ -1180,7 +1201,7 @@ function renderCompositeOnce() {
     const current = overlay.state.getCurrent(0)
     if (!current || !current.animation) {
       overlay.skeleton.setToSetupPose()
-      overlay.skeleton.updateWorldTransform()
+      runtime.updateWorldTransform(overlay.skeleton)
       return
     }
     renderer.drawSkeleton(overlay.skeleton, premultiplied)
@@ -1266,8 +1287,8 @@ function seekCompositeTo(p: SpinePlayer, time: number) {
   const duration = compositeDuration || compositeSchedule.reduce((max, seg) => Math.max(max, seg.start + seg.duration), 0)
   const normalizedTime = duration > 0 ? ((time % duration) + duration) % duration : 0
   compositeElapsed = normalizedTime
-  applySegmentsToState(state, skeleton, compositeSchedule.filter(seg => !seg.source && seg.track === 0), normalizedTime)
-  overlayInstances.forEach(overlay => applySegmentsToState(overlay.state, overlay.skeleton, overlay.segments, normalizedTime, true))
+  applySegmentsToState(state, skeleton, compositeSchedule.filter(seg => !seg.source && seg.track === 0), normalizedTime, false, true)
+  overlayInstances.forEach(overlay => applySegmentsToState(overlay.state, overlay.skeleton, overlay.segments, normalizedTime, true, true))
   if (overlayInstances.length > 0) {
     renderCompositeOnce()
   } else {
@@ -1352,14 +1373,14 @@ function computeTrimmedBounds(skeleton: SpineSkeleton | null) {
   const padding = 50
 
   return {
-    offset: new Vector2(minX - padding, minY - padding),
-    size: new Vector2(width + padding * 2, height + padding * 2),
+    offset: new runtime.classes.Vector2(minX - padding, minY - padding),
+    size: new runtime.classes.Vector2(width + padding * 2, height + padding * 2),
   }
 }
 
 function computeCameraBounds(skeleton: SpineSkeleton | null) {
-  const fallbackOffset = new Vector2()
-  const fallbackSize = new Vector2()
+  const fallbackOffset = new runtime.classes.Vector2()
+  const fallbackSize = new runtime.classes.Vector2()
   if (!skeleton) return { offset: fallbackOffset, size: fallbackSize }
 
   skeleton.getBounds(fallbackOffset, fallbackSize)
@@ -1771,7 +1792,7 @@ watch(
     if (!player || !player.skeleton || !player.animationState) return
     const skeleton = player.skeleton
     player.animationState.apply(skeleton)
-    skeleton.updateWorldTransform()
+    runtime.updateWorldTransform(skeleton)
     const current = store.layerVisibility
     for (const name of Object.keys(current)) {
       const isVisible = current[name] !== false
@@ -1784,7 +1805,7 @@ watch(
     }
     overlayInstances.forEach(overlay => {
       overlay.state.apply(overlay.skeleton)
-      overlay.skeleton.updateWorldTransform()
+      runtime.updateWorldTransform(overlay.skeleton)
       applyLayerVisibility(overlay.skeleton, overlay.source)
     })
     if (compositeActive && overlayInstances.length > 0) {
@@ -1806,6 +1827,11 @@ watch(activeBackgroundSrc, src => {
 })
 
 async function load() {
+  const token = ++loadToken
+  loadAbortController?.abort()
+  const controller = new AbortController()
+  loadAbortController = controller
+  loadError.value = ''
   if (!container.value) return
   clearCharacterClickTracking()
 
@@ -1828,13 +1854,14 @@ async function load() {
   const atlasUrl = char.customFiles?.atlas || `${path}.atlas`
   const rawDataURIs = char.customFiles?.images
 
-  offset = new Vector2()
-  size = new Vector2()
+  offset = new runtime.classes.Vector2()
+  size = new runtime.classes.Vector2()
 
   if (player) {
     resetComposite()
     clearExternalSkeletonCache()
     player.dispose()
+    player = null
     container.value.innerHTML = ''
     manualCamera = null
     if (detachCameraListeners) {
@@ -1843,28 +1870,56 @@ async function load() {
     }
   }
 
+  let skeletonUrl: string
+  let downloader: ReturnType<typeof createSkeletonDownloader>
+  try {
+    const response = await fetch(jsonUrl || binaryUrl, { signal: controller.signal })
+    if (!response.ok) throw new Error(`Could not load skeleton: HTTP ${response.status}.`)
+    const data = await response.arrayBuffer()
+    const json = jsonUrl ? JSON.parse(new TextDecoder().decode(data)) : undefined
+    const version = jsonUrl
+      ? readJsonSpineVersion(json)
+      : readBinarySpineVersion(new Uint8Array(data))
+    const selectedRuntime = await loadSpineRuntime(version)
+    if (token !== loadToken || controller.signal.aborted || !container.value) return
+    runtime = selectedRuntime
+    // 4.2 selects the parser by extension, including for uploaded blob URLs.
+    skeletonUrl = jsonUrl
+      ? (jsonUrl.endsWith('.json') ? jsonUrl : `${jsonUrl}#.json`)
+      : binaryUrl
+    downloader = createSkeletonDownloader(runtime, skeletonUrl, data, json)
+    offset = new runtime.classes.Vector2()
+    size = new runtime.classes.Vector2()
+  } catch (error) {
+    if (token === loadToken && !controller.signal.aborted) {
+      loadError.value = error instanceof Error ? error.message : String(error)
+    }
+    return
+  }
+
   ensureGLTexturePremultiplyPatch()
 
-  player = new SpinePlayer(container.value, {
+  const config: SpinePlayerConfig = {
     showControls: false,
-    ...((binaryUrl && !jsonUrl) && { binaryUrl }),
-    ...(jsonUrl && { jsonUrl }),
+    ...(!jsonUrl && { binaryUrl: skeletonUrl }),
+    ...(jsonUrl && { jsonUrl: skeletonUrl }),
     atlasUrl,
-  rawDataURIs,
-  backgroundColor: store.backgroundColor,
-  preserveDrawingBuffer: true,
-  premultipliedAlpha: true,
-  alpha: true,
-  viewport: {
-    x: offset.x,
-    y: offset.y,
-    width: Math.max(size.x, 1),
-    height: Math.max(size.y, 1),
-    padLeft: 0,
-    padRight: 0,
-    padTop: 50,
-    padBottom: 50,
-    transitionTime: 0,
+    rawDataURIs,
+    downloader,
+    backgroundColor: store.backgroundColor,
+    preserveDrawingBuffer: true,
+    premultipliedAlpha: true,
+    alpha: true,
+    viewport: {
+      x: offset.x,
+      y: offset.y,
+      width: Math.max(size.x, 1),
+      height: Math.max(size.y, 1),
+      padLeft: 0,
+      padRight: 0,
+      padTop: 50,
+      padBottom: 50,
+      transitionTime: 0,
     },
     update: () => {
       if (compositeActive && overlayInstances.length > 0) {
@@ -1928,9 +1983,10 @@ async function load() {
       drawOverlay()
     },
     success: (p: SpinePlayer) => {
+      if (token !== loadToken) return
       const skeleton = p.skeleton ?? null
       skeleton?.setToSetupPose()
-      skeleton?.updateWorldTransform()
+      runtime.updateWorldTransform(skeleton)
 
       const names = p.animationState?.data.skeletonData.animations.map((a: Animation) => a.name) || []
       for (const compositeDefinition of getCompositesForCurrent()) {
@@ -1986,7 +2042,7 @@ async function load() {
         if (!skinName || !skeleton) return null
         skeleton.setSkinByName(skinName)
         skeleton.setSlotsToSetupPose()
-        skeleton.updateWorldTransform()
+        runtime.updateWorldTransform(skeleton)
         return computeCameraBounds(skeleton)
       }
 
@@ -2033,20 +2089,20 @@ async function load() {
       const centerX = offset.x + size.x / 2
       const centerY = offset.y + size.y / 2
 
-      ;(p as unknown as SpinePlayerInternal).config.viewport = {
-        x: offset.x,
-        y: offset.y,
-        width: Math.max(size.x, 1),
-        height: Math.max(size.y, 1),
-        padLeft: 0,
-        padRight: 0,
-        padTop: 50,
-        padBottom: 50,
-        transitionTime: 0,
-        animations: {},
-      }
+        ; (p as unknown as SpinePlayerInternal).config.viewport = {
+          x: offset.x,
+          y: offset.y,
+          width: Math.max(size.x, 1),
+          height: Math.max(size.y, 1),
+          padLeft: 0,
+          padRight: 0,
+          padTop: 50,
+          padBottom: 50,
+          transitionTime: 0,
+          animations: {},
+        }
 
-      manualCamera = new OrthoCamera(
+      manualCamera = new runtime.classes.OrthoCamera(
         p.sceneRenderer!.camera.viewportWidth,
         p.sceneRenderer!.camera.viewportHeight,
       )
@@ -2062,9 +2118,9 @@ async function load() {
           ? paddedWidth / canvas.width
           : paddedHeight / canvas.height
       manualCamera.update()
-      defaultCameraPos = new Vector2(manualCamera.position.x, manualCamera.position.y)
+      defaultCameraPos = new runtime.classes.Vector2(manualCamera.position.x, manualCamera.position.y)
       defaultZoom = manualCamera.zoom
-      new CameraController(p.canvas!, manualCamera)
+      new runtime.classes.CameraController(p.canvas!, manualCamera)
       if (detachCameraListeners) detachCameraListeners()
       const handlePointerMove = () => requestPausedCompositeRender()
       const handleWheel = () => requestPausedCompositeRender()
@@ -2080,15 +2136,24 @@ async function load() {
       if (chosenSkin && skeleton) {
         skeleton.setSkinByName(chosenSkin)
         skeleton.setSlotsToSetupPose()
-        skeleton.updateWorldTransform()
+        runtime.updateWorldTransform(skeleton)
       }
 
       p.speed = store.animationSpeed
-  },
-})
-  player.speed = store.animationSpeed
-  applyPlayerBackgroundTransparency(player)
-  updateCanvasPointerEvents(player)
+    },
+    error: (_p: SpinePlayer, message: string) => {
+      if (token !== loadToken) return
+      loadError.value = message
+    },
+  }
+  try {
+    player = new runtime.classes.SpinePlayer(container.value, config)
+    player.speed = store.animationSpeed
+    applyPlayerBackgroundTransparency(player)
+    updateCanvasPointerEvents(player)
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : String(error)
+  }
 }
 watch(() => store.selectedCharacterId, () => {
   if (exportingAnimation) {
@@ -2134,7 +2199,7 @@ watch(() => store.selectedSkin, skin => {
     player.skeleton?.setSkinByName(skin)
     player.skeleton?.setSlotsToSetupPose()
     player.animationState?.apply(player.skeleton!)
-    player.skeleton!.updateWorldTransform()
+    runtime.updateWorldTransform(player.skeleton!)
     if (compositeActive && compositeMapping) {
       void startComposite(player, compositeMapping, compositeElapsed)
     }
@@ -2260,14 +2325,14 @@ function isRenderableAttachmentHit(slot: Slot, worldX: number, worldY: number) {
   const attachment = slot.getAttachment()
   if (!attachment) return false
 
-  if (attachment instanceof RegionAttachment) {
+  if (attachment instanceof runtime.classes.RegionAttachment) {
     if (attachment.color.a <= 0) return false
     const worldVertices = new Float32Array(8)
     attachment.computeWorldVertices(slot, worldVertices, 0, 2)
     return isPointInPolygon(worldX, worldY, worldVertices)
   }
 
-  if (attachment instanceof MeshAttachment) {
+  if (attachment instanceof runtime.classes.MeshAttachment) {
     if (attachment.color.a <= 0 || attachment.worldVerticesLength <= 0) return false
     const worldVertices = new Float32Array(attachment.worldVerticesLength)
     attachment.computeWorldVertices(slot, 0, attachment.worldVerticesLength, worldVertices, 0, 2)
@@ -2623,6 +2688,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  ++loadToken
+  loadAbortController?.abort()
   window.removeEventListener('keydown', onKeyDown)
   clearCharacterClickTracking()
   clearCharacterAudioPool()
@@ -2666,7 +2733,8 @@ function seek() {
     entry.trackTime = newTime
     entry.nextTrackLast = newTime
     player.animationState!.apply(player.skeleton)
-    player.skeleton.updateWorldTransform()
+    runtime.setSkeletonTime(player.skeleton, newTime)
+    runtime.updateWorldTransform(player.skeleton, true)
     ;(player as unknown as SpinePlayerInternal).drawFrame(false)
   }
 }
@@ -2716,7 +2784,7 @@ function saveScreenshot(transparent: boolean) {
   const canvas = player.canvas!
   const animationName = store.selectedAnimation
   const cam = manualCamera
-  const prevPos = new Vector2(cam.position.x, cam.position.y)
+  const prevPos = new runtime.classes.Vector2(cam.position.x, cam.position.y)
   const prevZoom = cam.zoom
   const prevWidth = canvas.width
   const prevHeight = canvas.height
@@ -2829,7 +2897,7 @@ async function exportAnimation(transparent: boolean): Promise<void> {
   const fps = 60
   const stepSeconds = 1 / fps
 
-  const prevPos = new Vector2(cam.position.x, cam.position.y)
+  const prevPos = new runtime.classes.Vector2(cam.position.x, cam.position.y)
   const prevZoom = cam.zoom
   const wasPlaying = store.playing
 
@@ -2871,7 +2939,8 @@ async function exportAnimation(transparent: boolean): Promise<void> {
         setSpineAnimation(p, animationName, { loop: false, forceNoMix: true })
         if (skeleton) {
           state.apply(skeleton)
-          skeleton.updateWorldTransform()
+          runtime.setSkeletonTime(skeleton, 0)
+          runtime.updateWorldTransform(skeleton, true)
         }
         resetComposite()
       }
@@ -2970,9 +3039,10 @@ async function exportAnimation(transparent: boolean): Promise<void> {
         if (compositeElapsed > targetDuration) compositeElapsed = targetDuration
         progress.value = compositeDuration > 0 ? Math.min(compositeElapsed / compositeDuration, 1) : 0
       } else {
+        runtime.advanceSkeleton(p.skeleton!, stepDuration)
         p.animationState?.update(stepDuration)
         p.animationState?.apply(p.skeleton!)
-        p.skeleton!.updateWorldTransform()
+        runtime.updateWorldTransform(p.skeleton!)
         compositeElapsed = frame * stepDuration
 
         const entry = p.animationState?.getCurrent(getActiveTrackIndexForSelectedAnimation(p.animationState))
@@ -3023,7 +3093,7 @@ async function exportAnimation(transparent: boolean): Promise<void> {
     } else if (animName) {
       setSpineAnimation(p, animName, { loop: true })
       p.animationState?.apply(p.skeleton!)
-      p.skeleton!.updateWorldTransform()
+      runtime.updateWorldTransform(p.skeleton!)
     }
 
     if (wasPlaying) {
@@ -3055,7 +3125,7 @@ function exportAnimationFrames(transparent: boolean): Promise<void> {
   return new Promise(async resolve => {
     applyPlayerBackgroundTransparency(p)
 
-    const prevPos = new Vector2(cam.position.x, cam.position.y)
+    const prevPos = new runtime.classes.Vector2(cam.position.x, cam.position.y)
     const prevZoom = cam.zoom
     const wasPlaying = store.playing
 
@@ -3101,7 +3171,8 @@ function exportAnimationFrames(transparent: boolean): Promise<void> {
         setSpineAnimation(p, animName, { loop: false, forceNoMix: true })
         if (skeleton) {
           state.apply(skeleton)
-          skeleton.updateWorldTransform()
+          runtime.setSkeletonTime(skeleton, 0)
+          runtime.updateWorldTransform(skeleton, true)
         }
         resetComposite()
       }
@@ -3180,9 +3251,10 @@ function exportAnimationFrames(transparent: boolean): Promise<void> {
         }
         progress.value = compositeDuration > 0 ? Math.min(compositeElapsed / compositeDuration, 1) : 0
       } else {
+        runtime.advanceSkeleton(p.skeleton!, stepDuration)
         p.animationState?.update(stepDuration)
         p.animationState?.apply(p.skeleton!)
-        p.skeleton!.updateWorldTransform()
+        runtime.updateWorldTransform(p.skeleton!)
         compositeElapsed = frame * stepDuration
 
         const entry = p.animationState?.getCurrent(getActiveTrackIndexForSelectedAnimation(p.animationState))
@@ -3243,7 +3315,7 @@ function exportAnimationFrames(transparent: boolean): Promise<void> {
       } else if (animName) {
         setSpineAnimation(p, animName, { loop: true })
         p.animationState?.apply(p.skeleton!)
-        p.skeleton!.updateWorldTransform()
+        runtime.updateWorldTransform(p.skeleton!)
         if (wasPlaying) {
           p.play()
         } else {

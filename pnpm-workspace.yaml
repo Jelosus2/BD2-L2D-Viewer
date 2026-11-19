@@ -1,3 +1,13 @@
 allowBuilds:
   '@tailwindcss/oxide': true
   esbuild: true
+
+# spine-player imports spine-core directly but only declares spine-webgl.
+# Declare the missing dependencies so the two players cannot share a hoisted core.
+packageExtensions:
+  '@esotericsoftware/spine-player@4.1.55':
+    dependencies:
+      '@esotericsoftware/spine-core': 4.1.55
+  '@esotericsoftware/spine-player@4.2.120':
+    dependencies:
+      '@esotericsoftware/spine-core': 4.2.120

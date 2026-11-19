@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-BkH6UD8pv2iZiD45mo8f9zFD6yUAgCaGu41AWG+kcjE=
+
 importers:
 
   .:
@@ -11,6 +13,9 @@ importers:
       '@esotericsoftware/spine-player':
         specifier: 4.1.55
         version: 4.1.55
+      '@esotericsoftware/spine-player-4.2':
+        specifier: npm:@esotericsoftware/spine-player@4.2.120
+        version: '@esotericsoftware/spine-player@4.2.120'
       '@tailwindcss/vite':
         specifier: ^4.1.10
         version: 4.1.10(vite@8.1.2(@types/node@22.15.32)(jiti@2.4.2))
@@ -144,11 +149,20 @@ packages:
   '@esotericsoftware/spine-core@4.1.55':
     resolution: {integrity: sha512-o7ZnXcaEhFqKjSNn8Tr9CZRPbV0DyvgMSraB9jWWGWdq4S0Jqox+tVhziEfj1+BXwJBKE9qw83NCLaV+Ku0lHA==}
 
+  '@esotericsoftware/spine-core@4.2.120':
+    resolution: {integrity: sha512-X62MPnfiZTWok4Wk5Q5DqaAUBUFypKpb94IVd1W/j4eLHhg0HH3tve4HvIlkgxDpls2NokHaAtzjxX12rJknOA==}
+
   '@esotericsoftware/spine-player@4.1.55':
     resolution: {integrity: sha512-koDnoAuGILaDwfxxesrZWqsbjPVeEVzaDWVDa4NMrOTQzVpt4vdFHGlwtxRnkRln+4bGjrEf3NrQm4UxMNN9/w==}
 
+  '@esotericsoftware/spine-player@4.2.120':
+    resolution: {integrity: sha512-N3LVJp0DkyK/h4AntTDedwDqLxrWYK9gedi0qWcrstgu/h7RYfdrXviza8qKt11v5dlyWpZACWbXLGicWbqfFA==}
+
   '@esotericsoftware/spine-webgl@4.1.55':
     resolution: {integrity: sha512-491cZdo3FHeWkHNLRYdjBvmmFnUZvqOffR60i5suWRCPHZ6w68n5qPUpVv0scZFCtuXa5g454ZWG1b3qwpANkw==}
+
+  '@esotericsoftware/spine-webgl@4.2.120':
+    resolution: {integrity: sha512-xhITm18dZ6DclPaI1jEiTVOoXYQASsubbDEs3Ik1AjmVSXdNFtvdvzLVwhPQ8eHu1OXsxtWfuW+wpGHib8V4hw==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -1537,13 +1551,25 @@ snapshots:
 
   '@esotericsoftware/spine-core@4.1.55': {}
 
+  '@esotericsoftware/spine-core@4.2.120': {}
+
   '@esotericsoftware/spine-player@4.1.55':
     dependencies:
+      '@esotericsoftware/spine-core': 4.1.55
       '@esotericsoftware/spine-webgl': 4.1.55
+
+  '@esotericsoftware/spine-player@4.2.120':
+    dependencies:
+      '@esotericsoftware/spine-core': 4.2.120
+      '@esotericsoftware/spine-webgl': 4.2.120
 
   '@esotericsoftware/spine-webgl@4.1.55':
     dependencies:
       '@esotericsoftware/spine-core': 4.1.55
+
+  '@esotericsoftware/spine-webgl@4.2.120':
+    dependencies:
+      '@esotericsoftware/spine-core': 4.2.120
 
   '@humanfs/core@0.19.1': {}
 
