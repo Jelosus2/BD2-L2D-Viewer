@@ -6,7 +6,7 @@ import { createCutsceneGraph } from "@/spine/createCutsceneGraph";
 import { createCutsceneTimeline } from "@/scene/createCutsceneTimeline";
 import { loadCutsceneAudio } from "@/audio/loadCutsceneAudio";
 import { createCutsceneAudioPlayback } from "@/audio/createCutsceneAudioPlayback";
-import { Application } from "pixi.js";
+import { Application, Renderer } from "pixi.js";
 
 export interface CutscenePreviewSnapshot {
     time: number;
@@ -97,6 +97,13 @@ export async function createCutscenePreview(
 
     function advance() {
         const now = performance.now();
+
+        if (!playing)
+        {
+            last = now;
+            return;
+        }
+
         const delta = playing && audio
             ? Math.max(0, audio.time - timeline!.time)
             : Math.max(0, now - last) / 1000;
@@ -278,6 +285,16 @@ export async function createCutscenePreview(
             autoDensity: true,
             resolution: Math.min(window.devicePixelRatio || 1, 2)
         });
+
+        const renderer = app.renderer;
+        if (!(renderer instanceof Renderer))
+            throw new Error("Cutscene preview requires WebGL rendering.");
+
+        for (const texture of visualMedia.textures)
+        {
+            controller.signal.throwIfAborted();
+            renderer.texture.bind(texture);
+        }
 
         app.stage.addChild(graph.root);
         app.view.setAttribute("aria-label", "Cutscene preview");

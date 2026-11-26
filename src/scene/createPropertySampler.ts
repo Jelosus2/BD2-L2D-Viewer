@@ -1,7 +1,7 @@
 import type { PropertyTrack, ScalarPropertyKey } from "@/types/scene";
 
 export function createPropertySampler(track: Extract<PropertyTrack, { kind: "scalar" }>): (timeSeconds: number) => number | undefined;
-export function createPropertySampler(track: Extract<PropertyTrack, { kind: "boolean" }>): (timeSeconds: number) => boolean | undefined;
+export function createPropertySampler(track: Extract<PropertyTrack, { kind: "boolean" | "threshold" }>): (timeSeconds: number) => boolean | undefined;
 export function createPropertySampler(track: PropertyTrack): (timeSeconds: number) => number | boolean | undefined;
 export function createPropertySampler(track: PropertyTrack) {
     function check(condition: unknown, message: string): asserts condition {
@@ -14,10 +14,10 @@ export function createPropertySampler(track: PropertyTrack) {
         return value;
     }
 
-    check(track?.kind === "scalar" || track?.kind === "boolean", "unknown track kind");
+    check(track?.kind === "scalar" || track?.kind === "boolean" || track?.kind === "threshold", "unknown track kind");
     check(Array.isArray(track.keys) && track.keys.length > 0, "empty or missing keys");
 
-    const keys = track.kind === "scalar"
+    const keys = track.kind !== "boolean"
         ? track.keys.map((key): ScalarPropertyKey => {
             const time = finite(key?.time);
             const value = finite(key?.value);
@@ -53,7 +53,7 @@ export function createPropertySampler(track: PropertyTrack) {
         check(key.time >= 0 && (index === 0 || key.time > keys[index - 1].time), "negative or unordered key time");
     });
 
-    return (timeSeconds: number): number | boolean | undefined => {
+    const sample = (timeSeconds: number): number | boolean | undefined => {
         finite(timeSeconds);
         check(timeSeconds >= 0, "negative sample time");
 
@@ -90,4 +90,19 @@ export function createPropertySampler(track: PropertyTrack) {
         const [a, b, c] = key.coefficients;
         return finite(((a * delta + b) * delta + c) * delta + value);
     };
+
+    if (track.kind === "threshold")
+    {
+        return (timeSeconds: number): boolean | undefined => {
+            const value = sample(timeSeconds);
+            if (value === undefined)
+                return undefined;
+
+            check(typeof value === "number", "invalid numeric boolean value");
+
+            return Math.abs(Math.fround(value)) > Math.fround(0.001);
+        };
+    }
+
+    return sample;
 }

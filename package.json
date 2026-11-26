@@ -14,7 +14,7 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
-    "@esotericsoftware/spine-pixi": "4.1.56",
+    "@esotericsoftware/spine-pixi-v7": "4.2.120",
     "@esotericsoftware/spine-player": "4.1.56",
     "@tailwindcss/vite": "^4.1.10",
     "jszip": "^3.10.1",

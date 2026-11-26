@@ -129,7 +129,7 @@ export async function loadStandingScene(catalogUrl: string, signal: AbortSignal)
     check(media.kind === "spine", "component media must be Spine");
 
     const version = text(media.version);
-    check(/^4\.1\.\d+$/.test(version), "expected Spine 4.1");
+    check(/^4\.2\.\d+$/.test(version), "expected Spine 4.2");
 
     const pages = Object.entries(object(media.pages));
     check(pages.length > 0, "no atlas pages declared");

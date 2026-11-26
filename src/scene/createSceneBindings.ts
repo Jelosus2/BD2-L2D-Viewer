@@ -57,6 +57,28 @@ export function createSceneBindings(scene: CutsceneScene, graph: CutsceneGraph):
                 return field(value.uvRect, target.property === "uvRect.x" ? "x" : "y");
             }
 
+            if (target.property.startsWith("dissolve."))
+            {
+                if (value.kind !== "spine" || !value.dissolve)
+                    throw new Error("Missing character dissolve parameters.");
+
+                const dissolve = value.dissolve;
+
+                if (target.property === "dissolve.amount")
+                    return field(dissolve, "amount");
+
+                if (target.property === "dissolve.angle")
+                {
+                    if (dissolve.mode !== "directional")
+                        throw new Error("Missing directional dissolve.");
+
+                    return field(dissolve, "angle");
+                }
+
+                const axis = target.property.slice(-1) as "r" | "g" | "b" | "a";
+                return field(dissolve.dissolveColor, axis);
+            }
+
             const color = value.color;
             const properties = {
                 "color.r": field(color, "r"),
@@ -65,10 +87,56 @@ export function createSceneBindings(scene: CutsceneScene, graph: CutsceneGraph):
                 "color.a": field(color, "a"),
             };
 
+            if (
+                target.property !== "color.r" &&
+                target.property !== "color.g" &&
+                target.property !== "color.b" &&
+                target.property !== "color.a"
+            )
+            {
+                throw new Error("Unknown animated component property.");
+            }
+
             return properties[target.property];
         }
 
         const value = node(target.id);
+
+        if (target.property.startsWith("spatial."))
+        {
+            if (!value.spatial)
+                throw new Error("Missing spatial parameters.");
+
+            if (target.property === "spatial.depth")
+                return field(value.spatial, "depth");
+
+            if (target.property === "spatial.scaleZ")
+                return field(value.spatial, "scaleZ");
+
+            return field(
+                value.spatial.rotation,
+                target.property === "spatial.rotation.x" ? "x" : "y"
+            );
+        }
+
+        if (target.property === "planeRotation.x" || target.property === "planeRotation.y")
+        {
+            if (!value.planeRotation)
+                throw new Error("Missing projected image rotation.");
+
+            return field(value.planeRotation, target.property === "planeRotation.x" ? "x" : "y");
+        }
+
+        if (target.property === "projectionScaleZ")
+        {
+            if (value.projectionScaleZ === undefined)
+                throw new Error("Missing nested image projection scale.");
+
+            return {
+                read: () => value.projectionScaleZ!,
+                write: (scale) => { value.projectionScaleZ = scale; }
+            };
+        }
 
         if (target.property === "opacity")
             return field(value, "opacity");
@@ -110,7 +178,12 @@ export function createSceneBindings(scene: CutsceneScene, graph: CutsceneGraph):
             ? field(node(target.id), "active")
             : field(component(target.id), "enabled");
 
-        return animate(property, createPropertySampler(track));
+        const sampledTrack = track.kind !== "boolean" || scene.timeline.propertyPeriodSeconds === undefined ? track : {
+            ...track,
+            keys: track.keys.map((key) => ({ ...key, time: tick(key.time) * 1e-12 }))
+        };
+
+        return animate(property, createPropertySampler(sampledTrack));
     });
 
     function tick(seconds: number): number {
@@ -152,11 +225,11 @@ export function createSceneBindings(scene: CutsceneScene, graph: CutsceneGraph):
             const time = tick(timeSeconds);
             const writes = properties.map((prepare) => prepare(timeSeconds));
 
-            for (const write of writes)
-                write();
-
             for (const activation of activations)
                 activation.apply(time);
+
+            for (const write of writes)
+                write();
 
             evaluated = true;
             graph.refresh();

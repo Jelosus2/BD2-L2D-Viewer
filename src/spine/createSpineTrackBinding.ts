@@ -1,8 +1,11 @@
-import type { Spine, TrackEntry } from "@esotericsoftware/spine-pixi";
 import type { SpineClip, SpineTrack } from "@/types/scene";
+
+import { Physics, type Spine, type TrackEntry } from "@esotericsoftware/spine-pixi-v7";
 
 export interface SpineTrackBinding {
     readonly boundaries: readonly number[];
+    readonly spine: Spine;
+    readonly holdsPose: boolean;
     evaluate(timeSeconds: number): void;
     pause(): void;
     resume(): void;
@@ -15,6 +18,7 @@ export function createSpineTrackBinding(spine: Spine, track: SpineTrack): SpineT
     let active: SpineClip | undefined;
     let lastStarted: SpineClip | undefined;
     let startedEntry: TrackEntry | null = null;
+    let emptyEntry: TrackEntry | null = null;
     let pausedEntry: TrackEntry | null = null;
     let previousTimeScale = 1;
     let paused = false;
@@ -40,6 +44,9 @@ export function createSpineTrackBinding(spine: Spine, track: SpineTrack): SpineT
 
     const listener = {
         dispose(entry: TrackEntry) {
+            if (entry === emptyEntry)
+                emptyEntry = null;
+
             if (entry === startedEntry)
                 startedEntry = null;
 
@@ -64,13 +71,15 @@ export function createSpineTrackBinding(spine: Spine, track: SpineTrack): SpineT
         if (end.mode === "freeze")
             startedEntry.timeScale = 0;
         else
-            state.setEmptyAnimation(index, end.seconds);
+            emptyEntry = state.setEmptyAnimation(index, end.seconds);
 
         startedEntry = null;
     }
 
     function start(clip: SpineClip, timeSeconds: number) {
-        const localTime = (timeSeconds - clip.start) * clip.speed + clip.clipIn;
+        emptyEntry = null;
+
+        const localTime = Math.max(0, timeSeconds - clip.start) * clip.speed + clip.clipIn;
         const trackTime = localTime * clip.speed;
 
         if (!Number.isFinite(trackTime))
@@ -93,9 +102,9 @@ export function createSpineTrackBinding(spine: Spine, track: SpineTrack): SpineT
         entry.timeScale = clip.speed;
         entry.alpha = clip.alpha;
         entry.holdPrevious = clip.holdPrevious;
-        entry.attachmentThreshold = clip.thresholds.attachment;
+        entry.mixAttachmentThreshold = clip.thresholds.attachment;
         entry.eventThreshold = clip.thresholds.event;
-        entry.drawOrderThreshold = clip.thresholds.drawOrder;
+        entry.mixDrawOrderThreshold = clip.thresholds.drawOrder;
 
         if (clip.mix.mode === "explicit")
             entry.mixDuration = clip.mix.seconds;
@@ -105,13 +114,17 @@ export function createSpineTrackBinding(spine: Spine, track: SpineTrack): SpineT
 
         spine.update(0);
         state.apply(spine.skeleton);
-        spine.skeleton.updateWorldTransform();
+        spine.skeleton.updateWorldTransform(Physics.update);
     }
 
     state.addListener(listener);
 
     return {
         boundaries,
+        spine,
+        get holdsPose() {
+            return emptyEntry !== null && state.getCurrent(index) === emptyEntry && emptyEntry.mixDuration === 0;
+        },
         evaluate(timeSeconds) {
             check();
 
@@ -170,6 +183,7 @@ export function createSpineTrackBinding(spine: Spine, track: SpineTrack): SpineT
 
             startedEntry = null;
             pausedEntry = null;
+            emptyEntry = null;
             active = undefined;
             lastStarted = undefined;
         }

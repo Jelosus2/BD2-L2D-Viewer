@@ -1,7 +1,7 @@
 import type { Renderer } from "pixi.js";
 
 import { Program } from "pixi.js";
-import { BlendMode, DarkTintMaterial, SpineTexture } from "@esotericsoftware/spine-pixi";
+import { BlendMode, DarkTintMaterial, SpineTexture } from "@esotericsoftware/spine-pixi-v7";
 import { SceneSlotMesh } from "./SceneSlotMesh";
 
 const vertex = `

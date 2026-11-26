@@ -11,7 +11,7 @@ import {
     Spine,
     SpineTexture,
     TextureAtlas,
-} from "@esotericsoftware/spine-pixi";
+} from "@esotericsoftware/spine-pixi-v7";
 
 extensions.add(DarkTintRenderer);
 

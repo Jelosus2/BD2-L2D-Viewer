@@ -62,13 +62,22 @@ export type SceneComponent = {
             startupSequence?: Array<{ animation: string; loop: boolean }>;
             pmaVertexColors?: true;
             timeScale?: number;
+            initialMixSeconds?: number;
+            dissolve?: CharacterDissolve;
         }
         | {
             kind: "image";
             mediaId: string;
-            blendMode: "normal" | "additive" | "multiply";
+            blendMode: "normal" | "additive" | "multiply" | "screen";
+            nativeMaterial?: "mobile-multiply" | "graph-additive";
             uvRect: { x: number; y: number; width: number; height: number };
             slicing?: ImageSlicing;
+            worldSprite?: {
+                positions: number[];
+                uvs: number[];
+                indices: number[];
+                order: number;
+            };
         }
     );
 
@@ -80,8 +89,18 @@ export interface SceneNode {
     opacity: number;
     layout: NodeLayout;
     components: SceneComponent[];
-    inverseParentScale?: { cameraHeight: number };
+    inverseParentScale?: { cameraHeight: number; independentAxes?: true };
     mask?: { imageComponentId: string; showGraphic: boolean };
+    planeRotation?: Vec2;
+    boneFollower?: { targetComponentId: string; bone: string; rotation: boolean };
+    projectionScaleZ?: number;
+    projectedChild?: { depth: number };
+    spatial?: {
+        depth: number;
+        scaleZ: number;
+        rotation: Vec2;
+        depthLimit: number;
+    };
 }
 
 export type SpineMix =
@@ -126,7 +145,12 @@ export interface ActivationTrack {
 export type NodeScalarProperty =
     | "opacity"
     | "layout.rotationDegrees"
-    | `layout.${"position"| "anchoredPosition"| "anchorMin"| "anchorMax"| "scale"| "pivot"| "sizeDelta"}.${"x"| "y"}`;
+    | `layout.${"position"| "anchoredPosition"| "anchorMin"| "anchorMax"| "scale"| "pivot"| "sizeDelta"}.${"x"| "y"}`
+    | `planeRotation.${"x" | "y"}`
+    | "projectionScaleZ"
+    | "spatial.depth"
+    | "spatial.scaleZ"
+    | `spatial.rotation.${"x" | "y"}`;;
 
 export type ScalarPropertyKey = {
     time: number;
@@ -148,7 +172,12 @@ export type PropertyTrack =
         | {
             kind: "component";
             id: string;
-            property: `color.${"r" | "g" | "b" | "a"}` | `uvRect.${"x" | "y"}`;
+            property:
+                | `color.${"r" | "g" | "b" | "a"}`
+                | `uvRect.${"x" | "y"}`
+                | "dissolve.amount"
+                | "dissolve.angle"
+                | `dissolve.dissolveColor.${"r" | "g" | "b" | "a"}`;
         };
         keys: ScalarPropertyKey[];
     }
@@ -158,6 +187,11 @@ export type PropertyTrack =
         | { kind: "node"; id: string; property: "active" }
         | { kind: "component"; id: string; property: "enabled" };
         keys: Array<{ time: number; value: boolean }>;
+    }
+    | {
+        kind: "threshold";
+        target: { kind: "node"; id: string; property: "active" };
+        keys: ScalarPropertyKey[];
     };
 
 export interface SceneTimeline {
@@ -188,3 +222,20 @@ export interface SceneLayoutProfile {
     referenceSize: Vec2;
     nodeLayouts: Record<string, NodeLayout>;
 }
+
+export type CharacterDissolve = {
+    amount: number;
+    dissolveColor: Color;
+} & (
+    | { mode: "noise-30" | "noise-50" }
+    | {
+        mode: "directional";
+        noiseMediaId: string;
+        noiseScale: number;
+        noiseStrength: number;
+        angle: number;
+        width: number;
+        externalNoise: number;
+        edgeColor: Color;
+    }
+);

@@ -1,3 +1,7 @@
 allowBuilds:
   '@tailwindcss/oxide': true
   esbuild: true
+packageExtensions:
+    "@esotericsoftware/spine-player@4.1.56":
+        dependencies:
+            "@esotericsoftware/spine-core": "4.1.56"

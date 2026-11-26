@@ -4,6 +4,17 @@ import type { SceneComponent, Vec2 } from "@/types/scene";
 import { Geometry } from "pixi.js";
 
 export function createImageGeometry(component: Extract<SceneComponent, { kind: "image" }>, media: ImageMedia, referencePixelsPerUnit: number) {
+    if (component.worldSprite)
+    {
+        const sprite = component.worldSprite;
+        const geometry = new Geometry()
+            .addAttribute("aVertexPosition", sprite.positions, 2)
+            .addAttribute("aTextureCoord", sprite.uvs, 2)
+            .addIndex(sprite.indices);
+
+        return { geometry, resize() {} };
+    }
+
     const uv = component.uvRect;
     const right = uv.x + uv.width;
     const top = uv.y + uv.height;

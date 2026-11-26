@@ -1,4 +1,4 @@
-import { BlendMode, DarkSlotMesh, SpineTexture } from "@esotericsoftware/spine-pixi";
+import { BlendMode, DarkSlotMesh, SpineTexture } from "@esotericsoftware/spine-pixi-v7";
 
 export class SceneSlotMesh extends DarkSlotMesh {
     constructor(
@@ -23,6 +23,7 @@ export class SceneSlotMesh extends DarkSlotMesh {
         }
 
         super.updateFromSpineData(...args);
+        this.darkTint = 0x000000;
         const vertices = args[3];
 
         if (this.pmaVertexColors)
@@ -34,7 +35,6 @@ export class SceneSlotMesh extends DarkSlotMesh {
                 Math.floor(vertices[3] * alpha) / 255,
                 Math.floor(vertices[4] * alpha) / 255
             ];
-            this.darkTint = 0x000000;
             this.alpha = alpha / 255;
         }
         else

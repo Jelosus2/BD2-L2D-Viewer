@@ -1,9 +1,9 @@
 import type { ImageMedia, MediaFile, SpineMedia } from "@/types/media";
-import type { SkeletonData } from "@esotericsoftware/spine-pixi";
+import type { SkeletonData } from "@esotericsoftware/spine-pixi-v7";
 
 import { readAsset } from "@/data/readAsset";
 import { ALPHA_MODES, MIPMAP_MODES, WRAP_MODES, BaseTexture, Texture } from "pixi.js";
-import { AtlasAttachmentLoader, SkeletonBinary, SpineTexture, TextureAtlas } from "@esotericsoftware/spine-pixi";
+import { AtlasAttachmentLoader, SkeletonBinary, SpineTexture, TextureAtlas } from "@esotericsoftware/spine-pixi-v7";
 
 export type LoadedMedia =
     | { kind: "image"; texture: Texture }
@@ -11,14 +11,20 @@ export type LoadedMedia =
         kind: "spine";
         data: SkeletonData;
         multiplyTextures?: ReadonlyMap<SpineTexture, SpineTexture>;
+        rawTextures?: ReadonlyMap<SpineTexture, SpineTexture>;
     };
 
 export interface SceneMedia {
     readonly items: ReadonlyMap<string, LoadedMedia>;
+    readonly textures: ReadonlySet<BaseTexture>;
     dispose(): void;
 }
 
-export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia | SpineMedia>>, signal: AbortSignal): Promise<SceneMedia> {
+export async function loadSceneMedia(
+    media: Readonly<Record<string, ImageMedia | SpineMedia>>,
+    signal: AbortSignal,
+    rawSpineMedia: ReadonlySet<string> = new Set()
+): Promise<SceneMedia> {
     const controller = new AbortController();
     const items = new Map<string, LoadedMedia>();
     const bases = new Set<BaseTexture>();
@@ -95,7 +101,7 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
         return texture;
     }
 
-    async function loadSpine(media: SpineMedia): Promise<LoadedMedia> {
+    async function loadSpine(media: SpineMedia, raw = false): Promise<LoadedMedia> {
         const [binary, atlasBytes] = await Promise.all([
             readAsset(media.skeleton, controller.signal),
             readAsset(media.atlas, controller.signal),
@@ -106,7 +112,7 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
         const atlas = new TextureAtlas(new TextDecoder().decode(atlasBytes));
         atlases.add(atlas);
 
-        const multiplyTextures = (media.multiplyBlend === "spine-ui" || media.multiplyBlend === "mobile")
+        const multiplyTextures = (media.multiplyBlend === "spine-ui" || media.multiplyBlend === "mobile" || raw)
             ? new Map<SpineTexture, SpineTexture>()
             : undefined;
 
@@ -146,7 +152,7 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
         parser.scale = media.parseScale;
 
         const data = parser.readSkeletonData(new Uint8Array(binary));
-        if (data.version !== media.version || !/^4\.1\.\d+$/.test(data.version))
+        if (data.version !== media.version || !/^4\.2\.\d+$/.test(data.version))
             throw new Error(`Spine version mismatch: ${data.version}`);
 
         for (const mix of media.mixes)
@@ -159,6 +165,7 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
             kind: "spine",
             data,
             ...(multiplyTextures ? { multiplyTextures } : {}),
+            ...(raw ? { rawTextures: multiplyTextures } : {}),
         };
     }
 
@@ -174,7 +181,7 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
 
             if (entry.kind === "spine")
             {
-                const loaded = await loadSpine(entry);
+                const loaded = await loadSpine(entry, rawSpineMedia.has(id));
 
                 controller.signal.throwIfAborted();
                 items.set(id, loaded);
@@ -199,7 +206,7 @@ export async function loadSceneMedia(media: Readonly<Record<string, ImageMedia |
         }
 
         controller.signal.throwIfAborted();
-        return { items, dispose };
+        return { items, textures: bases, dispose };
     }
     catch (error)
     {

@@ -95,13 +95,27 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
         const entries = array(raw.components).map((value): SceneComponent => {
             const component = parseComponent(value);
             check(component.kind !== "spine" || component.timeScale === undefined || isLoop, "per-instance Spine time scale requires a loop");
-            check(layout.kind === "rect", "visual component requires a RectTransform");
+            check(layout.kind === "rect" || component.kind === "image" && component.worldSprite !== undefined, "visual component requires a RectTransform or a world SpriteRenderer mesh");
             check(!components.has(component.id), "duplicate component ID");
 
             const asset = media.get(component.mediaId);
             check(asset?.kind === component.kind, "missing or incompatible component media");
+
+            if (component.kind === "image" && component.worldSprite)
+            {
+                check(layout.kind === "transform" && asset?.kind === "image" && asset.premultiplyAlpha === "shader" && asset.wrapMode === undefined,
+                    "world SpriteRenderer requires its native transform and alpha policy");
+            }
+
+            if (component.kind === "spine" && component.initialMixSeconds !== undefined)
+            {
+                check(isLoop && component.initialAnimation !== null && component.initialLoop &&
+                    asset?.kind === "spine" && component.initialMixSeconds === asset.defaultMixSeconds && asset.mixes.length === 0,
+                    "unsupported initial Spine mix");
+            }
+
             check(component.kind !== "image" || asset?.kind !== "image" ||
-                asset.premultiplyAlpha !== "shader" || component.blendMode === "normal",
+                asset.premultiplyAlpha !== "shader" || component.blendMode === "normal" || component.nativeMaterial === "mobile-multiply",
                 "shader-premultiplied image requires normal blending");
 
             check(component.kind !== "image" || asset?.kind !== "image" ||
@@ -120,11 +134,24 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
                     "invalid sliced image borders");
             }
 
+            if (component.kind === "image" && component.nativeMaterial)
+            {
+                check(asset?.kind === "image" && asset.premultiplyAlpha === "shader" && !component.slicing &&
+                    component.blendMode === (component.nativeMaterial === "mobile-multiply" ? "multiply" : "normal"),
+                    "invalid native image material");
+            }
+
             components.set(component.id, component);
             usedMedia.add(component.mediaId);
 
+            if (component.kind === "spine" && component.dissolve?.mode === "directional")
+                usedMedia.add(component.dissolve.noiseMediaId);
+
             return component;
         });
+
+        check(raw.inverseParentScale === undefined || object(raw.inverseParentScale).independentAxes === undefined || object(raw.inverseParentScale).independentAxes === true,
+            "invalid independent scale policy");
 
         return {
             id,
@@ -136,19 +163,152 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
             1),
             layout,
             components: entries,
+            ...(raw.boneFollower === undefined ? {} : { boneFollower: {
+                targetComponentId: text(object(raw.boneFollower).targetComponentId),
+                bone: text(object(raw.boneFollower).bone),
+                rotation: boolean(object(raw.boneFollower).rotation)
+            } }),
+            ...(raw.planeRotation === undefined ? {} : { planeRotation: vector(raw.planeRotation) }),
+            ...(raw.projectionScaleZ === undefined ? {} : {
+                projectionScaleZ: number(raw.projectionScaleZ)
+            }),
+            ...(raw.projectedChild === undefined ? {} : {
+                projectedChild: { depth: number(object(raw.projectedChild).depth) }
+            }),
             ...(raw.mask === undefined ? {} : { mask: {
                 imageComponentId: text(object(raw.mask).imageComponentId),
                 showGraphic: boolean(object(raw.mask).showGraphic)
             } }),
             ...(raw.inverseParentScale === undefined ? {} : {
                 inverseParentScale: {
-                    cameraHeight: number(object(raw.inverseParentScale).cameraHeight, Number.MIN_VALUE)
+                    cameraHeight: number(object(raw.inverseParentScale).cameraHeight, Number.MIN_VALUE),
+                    ...(object(raw.inverseParentScale).independentAxes === undefined ? {} : {
+                        independentAxes: true as const
+                    })
+                }
+            }),
+            ...(raw.spatial === undefined ? {} : {
+                spatial: {
+                    depth: number(object(raw.spatial).depth),
+                    scaleZ: number(object(raw.spatial).scaleZ),
+                    rotation: vector(object(raw.spatial).rotation),
+                    depthLimit: number(object(raw.spatial).depthLimit, Number.MIN_VALUE)
                 }
             })
         };
     });
 
-    check(nodes.length > 0 && nodes[0].layout.kind === "rect", "missing authored root rectangle");
+    check(nodes.length > 0 && (nodes[0].layout.kind === "rect" || rootMode === "stretch-to-host"), "missing authored root rectangle");
+
+    for (const node of nodes)
+    {
+        for (const component of node.components)
+        {
+            if (component.kind !== "spine" || !component.dissolve)
+                continue;
+
+            check(!component.pmaVertexColors && !node.mask, "unsupported dissolve color or mask policy");
+
+            if (component.dissolve.mode === "directional")
+            {
+                const noise = media.get(component.dissolve.noiseMediaId);
+                check(noise?.kind === "image" && noise.premultiplyAlpha === "shader", "missing straight-alpha dissolve noise");
+            }
+        }
+    }
+
+    const spatial = nodes.some((node) => node.spatial !== undefined);
+
+    check(
+        !spatial || nodes.every((node) =>
+            node.spatial &&
+            node.layout.kind === "rect" &&
+            !node.mask &&
+            !node.boneFollower &&
+            !node.planeRotation &&
+            !node.projectedChild &&
+            node.projectionScaleZ === undefined &&
+            !node.inverseParentScale &&
+            node.spatial.depthLimit === nodes[0].spatial!.depthLimit &&
+            !node.components.some((component) =>component.kind === "image" && component.worldSprite)
+        ),
+        "unsupported spatial hierarchy"
+    );
+
+    check(
+        !spatial ||
+        nodes[0].spatial!.depth === 0 &&
+        nodes[0].spatial!.scaleZ === 1 &&
+        nodes[0].spatial!.rotation.x === 0 &&
+        nodes[0].spatial!.rotation.y === 0,
+        "spatial loaded root differs from native attachment"
+    );
+
+    const spriteOrders = new Set<number>();
+
+    for (const node of nodes)
+    {
+        for (const component of node.components)
+        {
+            if (component.kind !== "image" || !component.worldSprite)
+                continue;
+
+            check(!spriteOrders.has(component.worldSprite.order), "equal world SpriteRenderer sorting orders");
+            spriteOrders.add(component.worldSprite.order);
+
+            let ancestor: SceneNode | undefined = node;
+
+            while (ancestor)
+            {
+                check(!ancestor.mask && !ancestor.planeRotation && !ancestor.boneFollower, "unsupported world SpriteRenderer ancestry");
+
+                ancestor = ancestor.parentId === null
+                    ? undefined
+                    : nodes.find((value) => value.id === ancestor!.parentId);
+            }
+        }
+    }
+
+    for (const node of nodes.filter((node) => node.planeRotation !== undefined))
+    {
+        check(node.parentId !== null && node.layout.kind === "rect" &&
+            !node.inverseParentScale &&
+            nodes.filter((child) => child.parentId === node.id).every((child) =>
+                child.layout.kind === "rect" &&
+                (!child.planeRotation || child.projectedChild !== undefined) && !child.boneFollower &&
+                !child.inverseParentScale && !child.mask &&
+                !nodes.some((descendant) => descendant.parentId === child.id) &&
+                child.components.length > 0 &&
+                child.components.every((component) => component.kind === "image")) &&
+            node.components.length > 0 &&
+            node.components.every((component) => component.kind === "image"),
+            "projected rotation requires an image rectangle");
+    }
+
+    for (const node of nodes)
+    {
+        const parent = node.parentId === null ? undefined : nodes.find((value) => value.id === node.parentId);
+
+        if (node.projectedChild)
+        {
+            check(parent?.planeRotation !== undefined && parent.projectionScaleZ !== undefined &&
+                node.layout.kind === "rect" && !node.mask && !node.boneFollower && !node.inverseParentScale &&
+                node.components.length > 0 && node.components.every((component) => component.kind === "image") &&
+                !nodes.some((child) => child.parentId === node.id),
+                "invalid nested projected child");
+        }
+
+        if (node.projectionScaleZ !== undefined)
+        {
+            check(node.planeRotation !== undefined && !node.projectedChild &&
+                nodes.some((child) => child.parentId === node.id) &&
+                nodes.filter((child) => child.parentId === node.id).every((child) => child.projectedChild !== undefined),
+                "invalid nested projection parent");
+        }
+    }
+
+    check(!nodes.some((node) => node.mask) || !nodes.some((node) => node.components.some((component) =>
+        component.kind === "image" && component.nativeMaterial)), "native image masks require separate support");
 
     const maskDepths = new Map<string, number>();
 
@@ -165,7 +325,7 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
         const image = node.components.find((component) => component.id === node.mask!.imageComponentId);
         const asset = image && media.get(image.mediaId);
 
-        check(image?.kind === "image" && image.enabled && image.blendMode === "normal" && asset?.kind === "image" && asset.premultiplyAlpha !== "shader",
+        check(image?.kind === "image" && image.enabled && ["normal", "additive"].includes(image.blendMode) && asset?.kind === "image" && asset.premultiplyAlpha !== "shader",
             "invalid mask image");
     }
 
@@ -174,17 +334,30 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
         const root = nodes[0].layout;
 
         check(
-            root.kind === "rect" && root.anchorMin.x === 0 && root.anchorMin.y === 0 &&
+            (root.kind === "transform" ? root.position.x === 0 && root.position.y === 0 :
+            root.anchorMin.x === 0 && root.anchorMin.y === 0 &&
             root.anchorMax.x === 1 && root.anchorMax.y === 1 &&
             root.pivot.x === 0.5 && root.pivot.y === 0.5 &&
             root.anchoredPosition.x === 0 && root.anchoredPosition.y === 0 &&
-            root.sizeDelta.x === 0 && root.sizeDelta.y === 0 &&
+            root.sizeDelta.x === 0 && root.sizeDelta.y === 0) &&
             root.scale.x === 1 && root.scale.y === 1 && root.rotationDegrees === 0,
             "native host requires a centered full-stretch root"
         );
     }
 
     const byId = new Map(nodes.map((node) => [node.id, node]));
+
+    for (const node of nodes.filter((node) => node.boneFollower !== undefined))
+    {
+        const follower = node.boneFollower!;
+        const parent = node.parentId === null ? undefined : byId.get(node.parentId);
+
+        check(node.layout.kind === "rect" && !node.planeRotation && !node.inverseParentScale &&
+            parent?.components.some((component) => component.id === follower.targetComponentId && component.kind === "spine" && component.enabled) &&
+            !node.components.some((component) => component.kind === "spine"),
+            "bone follower requires a direct Spine parent and an image rectangle");
+    }
+
     const timeline = object(scene.timeline);
     const clipIds = new Set<string>();
     const spineTargets = new Set<string>();
@@ -287,7 +460,7 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
     const propertyTracks = array(timeline.propertyTracks).map((value): PropertyTrack => {
         const raw = object(value);
         const target = object(raw.target);
-        const kind = choice(raw.kind, ["scalar", "boolean"]);
+        const kind = choice(raw.kind, ["scalar", "boolean", "threshold"]);
         const targetKind = choice(target.kind, ["node", "component"]);
         const id = text(target.id);
         check(targetKind === "node" ? byId.has(id) : components.has(id), "missing property target");
@@ -304,14 +477,25 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
 
             if (targetKind === "node")
             {
-                check(target.property === "active" && !activationTargets.has(id), "competing active-state control");
-                track = { kind,target: { kind: "node", id, property: "active" }, keys };
+                check(target.property === "active", "unsupported boolean node property");
+                track = { kind, target: { kind: "node", id, property: "active" }, keys };
             }
             else
             {
                 check(target.property === "enabled", "unsupported boolean component property");
                 track = { kind, target: { kind: "component", id, property: "enabled" }, keys };
             }
+        }
+        else if (kind === "threshold")
+        {
+            check(!isLoop && targetKind === "node" && target.property === "active",
+                "numeric boolean requires a node activation property");
+
+            track = {
+                kind,
+                target: { kind: "node", id, property: "active" },
+                keys: array(raw.keys).map(parseScalarKey)
+            };
         }
         else
         {
@@ -328,22 +512,39 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
                     "layout.anchorMax.x", "layout.anchorMax.y",
                     "layout.pivot.x", "layout.pivot.y",
                     "layout.sizeDelta.x", "layout.sizeDelta.y",
+                    "planeRotation.x", "planeRotation.y",
+                    "projectionScaleZ",
+                    "spatial.depth", "spatial.scaleZ",
+                    "spatial.rotation.x", "spatial.rotation.y"
                 ]);
 
                 const layout = byId.get(id)?.layout;
 
-                check(rootMode !== "stretch-to-host" || id !== nodes[0].id || !property.startsWith("layout."), "animated loaded-root layout requires separate support");
+                check(!property.startsWith("spatial.") || byId.get(id)?.spatial !== undefined,
+                    "missing spatial target");
+                check(property !== "projectionScaleZ" || byId.get(id)?.projectionScaleZ !== undefined,
+                    "missing nested projection target");
+                check(!property.startsWith("planeRotation.") || byId.get(id)?.planeRotation !== undefined,
+                    "missing projected rotation target");
+                check(rootMode !== "stretch-to-host" || id !== nodes[0].id || !property.startsWith("layout.") ||
+                    /^layout\.(anchorMin|anchorMax|anchoredPosition|sizeDelta|scale|position)\.[xy]$/.test(property) || property === "layout.rotationDegrees",
+                    "unsupported animated loaded-root layout");
+
                 check(!property.startsWith("layout.position.") || layout?.kind === "transform", "position on a rect node");
-                check(
-                    !/^layout\.(anchorMin|anchorMax|anchoredPosition|pivot|sizeDelta)\./.test(property) || layout?.kind === "rect",
-                    "rect property on a transform node"
-                );
+                check(!/^layout\.(anchorMin|anchorMax|anchoredPosition|pivot|sizeDelta)\./.test(property) || layout?.kind === "rect",
+                    "rect property on a transform node");
 
                 track = { kind, target: { kind: "node", id, property }, keys };
             }
             else
             {
-                const property = choice(target.property, ["color.r", "color.g", "color.b", "color.a", "uvRect.x", "uvRect.y"]);
+                const property = choice(target.property, [
+                    "color.r", "color.g", "color.b", "color.a",
+                    "uvRect.x", "uvRect.y",
+                    "dissolve.amount", "dissolve.angle",
+                    "dissolve.dissolveColor.r", "dissolve.dissolveColor.g",
+                    "dissolve.dissolveColor.b", "dissolve.dissolveColor.a"
+                ]);
 
                 if (property.startsWith("uvRect."))
                 {
@@ -352,6 +553,14 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
 
                     check(component.kind === "image" && !component.slicing && asset?.kind === "image" && asset.wrapMode === "repeat",
                         "animated UV requires an unsliced repeating image");
+                }
+
+                if (property.startsWith("dissolve."))
+                {
+                    const component = components.get(id);
+
+                    check(component?.kind === "spine" && component.dissolve && (property !== "dissolve.angle" || component.dissolve.mode === "directional"),
+                        "missing character dissolve target");
                 }
 
                 track = { kind, target: { kind: "component", id, property }, keys };
@@ -416,20 +625,38 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
     let durationSeconds: number | null = null;
     if (isLoop)
     {
-        check(timeline.durationSeconds === null && spineTracks.length === 0 &&
-            activationTracks.length === 0 && audioCues.length === 0,
+        check(timeline.durationSeconds === null && activationTracks.length === 0 && audioCues.length === 0,
             "loop contains unsupported timeline tracks");
 
         check(propertyPeriodSeconds === undefined
             ? propertyTracks.length === 0
-            : propertyTracks.length > 0 && propertyTracks.every((track) => track.kind === "scalar" && track.keys[0].time === 0),
-            "loop requires scalar properties and a repeat period");
+            : propertyTracks.length > 0 && propertyTracks.every((track) => track.keys[0].time === 0),
+            "loop requires properties starting at zero and a repeat period");
+
+        check(propertyTracks.every((track) => track.kind !== "boolean" || track.keys.every((key, index) =>
+            index === 0 || Math.trunc(key.time / 1e-12 + 0.5) > Math.trunc(track.keys[index - 1].time / 1e-12 + 0.5))),
+            "repeating boolean keys collide at the scene clock resolution");
+
+        check(spineTracks.every((track) =>
+            propertyPeriodSeconds !== undefined && track.trackIndex === 0 &&
+            components.get(track.targetComponentId)?.enabled === true &&
+            track.clips.length === 1 && track.clips[0].start === 0 &&
+            track.clips[0].duration < propertyPeriodSeconds &&
+            track.clips[0].clipIn === 0 &&
+            Math.trunc(track.clips[0].duration / 1e-12 + 0.5) < Math.trunc(propertyPeriodSeconds / 1e-12 + 0.5) &&
+            track.clips[0].speed === 1 && track.clips[0].loop &&
+            track.clips[0].pauseWithScene &&
+            track.clips[0].alpha === 1 && !track.clips[0].holdPrevious &&
+            track.clips[0].end.mode === "mix-out" &&
+            (track.clips[0].mix.mode === "skeleton-default" || track.clips[0].mix.seconds === 0) &&
+            Object.values(track.clips[0].thresholds).every((value) => value === 0.5)),
+            "unsupported repeating Spine schedule");
 
         check(nodes.every((node) => node.active), "loop contains inactive nodes");
 
         const spines = [...components.values()].filter((component) => component.kind === "spine" && component.enabled);
-        check(spines.length > 0 && spines.every((component) => component.kind === "spine" &&
-            component.initialAnimation !== null && component.initialLoop), "missing authored Spine loop");
+        check(spines.some((component) => component.kind === "spine" && component.initialAnimation !== null && component.initialLoop) || spineTracks.length > 0,
+            "missing authored Spine loop");
     }
     else
     {
@@ -469,6 +696,9 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
 
             const nodeLayouts = Object.fromEntries(entries.map(([nodeId, value]) => {
                 const layout = parseLayout(value);
+
+                check(!byId.get(nodeId)?.boneFollower, "responsive bone follower requires separate support");
+                check(!byId.get(nodeId)?.planeRotation, "projected locator layout requires separate support");
                 check(nodeId !== nodes[0].id && byId.get(nodeId)?.layout.kind === "rect" && layout.kind === "rect", "unknown profile node, loaded-root override or incompatible layout");
 
                 return [nodeId, layout];
@@ -480,8 +710,21 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
     check(layoutProfiles === undefined || layoutProfiles.length === 2, "expected both layout orientations");
     check(!layoutProfiles?.some((profile) => propertyTracks.some((track) =>
         track.target.kind === "node" && track.target.property.startsWith("layout.") &&
+        !(track.keys[0].time === 0 && /^layout\.sizeDelta\.[xy]$/.test(track.target.property)) &&
         Object.prototype.hasOwnProperty.call(profile.nodeLayouts, track.target.id))),
         "layout profile overrides animated layout");
+
+    check(!layoutProfiles?.some((profile) => nodes.some((node) => node.projectionScaleZ !== undefined &&
+        Object.prototype.hasOwnProperty.call(profile.nodeLayouts, node.id))),
+        "nested projection parent has a layout profile");
+
+    for (const node of nodes.filter((node) => node.parentId !== null && byId.get(node.parentId)?.planeRotation))
+    {
+        check(!layoutProfiles?.some((profile) => Object.prototype.hasOwnProperty.call(profile.nodeLayouts, node.id)) &&
+            !propertyTracks.some((track) => track.target.kind === "node" && track.target.id === node.id &&
+            (track.target.property.startsWith("layout.") || track.target.property.startsWith("planeRotation."))),
+            "projected image children require static transforms");
+    }
 
     for (const node of nodes.filter((node) => node.inverseParentScale !== undefined))
     {
@@ -497,9 +740,45 @@ function parseScene(value: unknown, revision: string, isLoop: boolean): Cutscene
             check(parent.inverseParentScale === undefined, "nested inverse scales");
 
             for (const layout of [parent.layout, ...(layoutProfiles ?? []).map((profile) => profile.nodeLayouts[parentId!]).filter(Boolean)])
-                check(layout.scale.x === layout.scale.y && layout.scale.x > 0, "inverse scale requires uniform positive parents");
+            {
+                check(layout.scale.x > 0 && layout.scale.y > 0 && (node.inverseParentScale?.independentAxes || layout.scale.x === layout.scale.y),
+                    "inverse scale requires supported positive parents");
+            }
+
+            check(!node.inverseParentScale?.independentAxes || !parent.planeRotation && !parent.boneFollower, "independent inverse scales require planar parents");
 
             parentId = parent.parentId;
+        }
+    }
+
+    for (const node of nodes.filter((node) => node.boneFollower !== undefined))
+    {
+        check(!propertyTracks.some((track) => track.target.kind === "node" && track.target.id === node.id &&
+            track.target.property !== "active" && track.target.property !== "opacity"),
+            "bone follower layout conflicts with property animation");
+
+        const branch = new Set([node.id]);
+
+        for (const child of nodes)
+        {
+            if (child.parentId !== null && branch.has(child.parentId))
+                branch.add(child.id);
+
+            check(!branch.has(child.id) || !child.components.some((component) => component.kind === "spine"), "nested Spine follower hierarchy requires separate support");
+        }
+
+        let ancestor: SceneNode | undefined = node;
+
+        while (ancestor)
+        {
+            const id = ancestor.id;
+
+            check(!ancestor.planeRotation && !ancestor.inverseParentScale &&
+                !layoutProfiles?.some((profile) => Object.prototype.hasOwnProperty.call(profile.nodeLayouts, id)) &&
+                !propertyTracks.some((track) => track.target.kind === "node" && track.target.id === id && track.target.property.startsWith("planeRotation.")),
+                "projected or responsive follower ancestry requires separate support");
+
+            ancestor = ancestor.parentId === null ? undefined : byId.get(ancestor.parentId);
         }
     }
 
@@ -559,6 +838,30 @@ function parseLayout(value: unknown): NodeLayout {
     };
 }
 
+function parseDissolve(value: unknown): NonNullable<Extract<SceneComponent, { kind: "spine" }>["dissolve"]> {
+    const raw = object(value);
+    const mode = choice(raw.mode, ["directional", "noise-30", "noise-50"]);
+    const common = {
+        amount: number(raw.amount),
+        dissolveColor: color(raw.dissolveColor)
+    };
+
+    if (mode !== "directional")
+        return { ...common, mode };
+
+    return {
+        ...common,
+        mode,
+        noiseMediaId: text(raw.noiseMediaId),
+        noiseScale: number(raw.noiseScale, Number.MIN_VALUE),
+        noiseStrength: number(raw.noiseStrength),
+        angle: number(raw.angle),
+        width: number(raw.width, Number.MIN_VALUE),
+        externalNoise: number(raw.externalNoise),
+        edgeColor: color(raw.edgeColor)
+    };
+}
+
 function parseComponent(value: unknown): SceneComponent {
     const entry = object(value);
     const common = { id: text(entry.id), mediaId: text(entry.mediaId), enabled: boolean(entry.enabled), color: color(entry.color) };
@@ -567,11 +870,19 @@ function parseComponent(value: unknown): SceneComponent {
     {
         const uv = object(entry.uvRect);
         const slicing = entry.slicing === undefined ? undefined : parseImageSlicing(entry.slicing);
+        const worldSprite = entry.worldSprite === undefined
+            ? undefined
+            : parseWorldSprite(entry.worldSprite);
+
+        check(worldSprite === undefined || (slicing === undefined && entry.nativeMaterial === undefined && entry.blendMode === "normal"),
+            "unsupported world SpriteRenderer material");
 
         return {
             ...common,
             kind: "image",
-            blendMode: choice(entry.blendMode, ["normal", "additive", "multiply"]),
+            blendMode: choice(entry.blendMode, ["normal", "additive", "multiply", "screen"]),
+            ...(entry.nativeMaterial === undefined ? {} : { nativeMaterial: choice(entry.nativeMaterial, ["mobile-multiply", "graph-additive"]) }),
+            ...(worldSprite === undefined ? {} : { worldSprite }),
             ...(slicing === undefined ? {} : { slicing }),
             uvRect: {
                 x: number(uv.x),
@@ -594,9 +905,31 @@ function parseComponent(value: unknown): SceneComponent {
         renderScale: number(entry.renderScale, Number.MIN_VALUE),
         initialAnimation: entry.initialAnimation === null ? null : text(entry.initialAnimation),
         initialLoop: boolean(entry.initialLoop),
+        ...(entry.initialMixSeconds === undefined ? {} : {
+            initialMixSeconds: number(entry.initialMixSeconds, Number.MIN_VALUE)
+        }),
         ...(entry.timeScale === undefined ? {} : { timeScale: number(entry.timeScale, 0.001, 1000) }),
-        ...(entry.pmaVertexColors === true ? { pmaVertexColors: true as const } : {})
+        ...(entry.pmaVertexColors === true ? { pmaVertexColors: true as const } : {}),
+        ...(entry.dissolve === undefined ? {} : { dissolve: parseDissolve(entry.dissolve) })
     };
+}
+
+function parseWorldSprite(value: unknown): NonNullable<Extract<SceneComponent, { kind: "image" }>["worldSprite"]> {
+    const entry = object(value);
+    const positions = array(entry.positions).map((value) => number(value));
+    const uvs = array(entry.uvs).map((value) => number(value, -0.000001, 1.000001));
+    const indices = array(entry.indices).map((value) => integer(value, 0));
+
+    check(positions.length >= 6 && positions.length <= 131070 &&
+        positions.length % 2 === 0 && uvs.length === positions.length &&
+        indices.length > 0 && indices.length % 3 === 0 &&
+        indices.every((index) => index < positions.length / 2),
+        "invalid world SpriteRenderer geometry");
+
+    const order = integer(entry.order, 1);
+    check(order <= 32767, "invalid world SpriteRenderer sorting order");
+
+    return { positions, uvs, indices, order };
 }
 
 function parseImageSlicing(value: unknown): ImageSlicing {
@@ -623,7 +956,8 @@ function parseMedia(value: unknown): SpineMedia | ImageMedia | AudioMedia {
         check(entry.wrapMode === undefined || entry.wrapMode === "repeat", "unsupported image wrap mode");
 
         const width = integer(entry.width, 1), height = integer(entry.height, 1);
-        check(entry.wrapMode !== "repeat" || [width, height].every((value) => Number.isInteger(Math.log2(value))), "repeat image dimensions must be powers of two");
+        check(entry.wrapMode !== "repeat" || [width, height].every((value) => Number.isInteger(Math.log2(value))) || (entry.mipmap === false && entry.premultiplyAlpha === undefined),
+            "non-power-of-two repeat images require one premultiplied mip level");
 
         check(entry.mipmap === undefined || entry.mipmap === false, "unsupported image mipmap policy");
         check(entry.premultiplyAlpha === undefined || entry.premultiplyAlpha === "shader", "unsupported image alpha policy");
@@ -642,7 +976,7 @@ function parseMedia(value: unknown): SpineMedia | ImageMedia | AudioMedia {
     if (entry.kind === "audio")
         return parseAudioMedia(entry);
 
-    check(entry.kind === "spine" && /^4\.1\.\d+$/.test(text(entry.version)), "expected Spine 4.1 or image media");
+    check(entry.kind === "spine" && /^4\.2\.\d+$/.test(text(entry.version)), "expected Spine 4.2 or image media");
     const pages = Object.entries(object(entry.pages));
 
     check(pages.length > 0 && pages.every(([name]) => /^[^/\\]+\.png$/.test(name)), "invalid atlas page names");

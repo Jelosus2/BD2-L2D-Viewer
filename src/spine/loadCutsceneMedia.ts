@@ -1,4 +1,4 @@
-import type { SkeletonData } from "@esotericsoftware/spine-pixi";
+import type { SkeletonData } from "@esotericsoftware/spine-pixi-v7";
 import type { CutsceneScene } from "@/data/loadCutsceneScene";
 import type { SceneMedia } from "./loadSceneMedia";
 import type { ImageMedia, SpineMedia } from "@/types/media";
@@ -14,7 +14,13 @@ export async function loadCutsceneMedia(scene: CutsceneScene, signal: AbortSigna
             visualMedia[id] = media;
     }
 
-    const resources = await loadSceneMedia(visualMedia, signal);
+    const rawSpineMedia = new Set(scene.nodes.flatMap((node) =>
+        node.components
+            .filter((component) => component.kind === "spine" && component.dissolve)
+            .map((component) => component.mediaId)
+    ));
+
+    const resources = await loadSceneMedia(visualMedia, signal, rawSpineMedia);
 
     try
     {

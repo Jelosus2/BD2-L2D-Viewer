@@ -49,7 +49,7 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
         propertyPeriodTicks !== undefined &&
         (duration !== null || propertyPeriodTicks < 1 ||
         data.timeline.propertyTracks.length === 0 ||
-        data.timeline.propertyTracks.some((track) => track.kind !== "scalar" || track.keys[0]?.time !== 0))
+        data.timeline.propertyTracks.some((track) => track.keys[0]?.time !== 0))
     )
     {
         throw new Error("Invalid continuous property loop.");
@@ -58,11 +58,12 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
     if (duration === null)
     {
         if (
-            data.timeline.spineTracks.length || data.timeline.activationTracks.length ||
+            (data.timeline.spineTracks.length > 0 && propertyPeriodTicks === undefined) ||
+            data.timeline.activationTracks.length ||
             data.timeline.audioCues.length || (propertyPeriodTicks === undefined && data.timeline.propertyTracks.length)
         )
         {
-            throw new Error("Continuous loops only support repeating scalar property tracks.");
+            throw new Error("Continuous loops only support repeating property tracks.");
         }
     }
     else
@@ -77,11 +78,34 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
 
     const boundaries = [...new Set([
         ...nativeBoundaries,
-        ...data.timeline.propertyTracks.flatMap((track) => track.kind === "boolean"
+        ...data.timeline.propertyTracks.flatMap((track) => track.kind !== "scalar"
             ? track.keys.map((key) => key.time)
             : []),
         ...(duration === null ? [] : [duration])
     ])].filter((value) => value > 0 && (duration === null || value <= duration)).sort((a, b) => a - b);
+
+    const repeatingBoundaries = propertyPeriodTicks === undefined ? [] : [...new Set([0,
+        ...data.timeline.propertyTracks.flatMap((track) => track.kind !== "scalar"
+            ? track.keys.map((key) => tick(key.time)).filter((time) => time < propertyPeriodTicks)
+            : []),
+        ...data.timeline.spineTracks.flatMap((track) => track.clips.flatMap((clip) =>
+            [tick(clip.start), tick(clip.start + clip.duration)]))
+    ])].sort((a, b) => a - b);
+
+    const repeatsBooleans = data.timeline.propertyTracks.some((track) => track.kind !== "scalar");
+    const refreshAfterPose = data.nodes.some((node) => node.boneFollower !== undefined || node.spatial !== undefined);
+
+    function nextRepeatingBoundary(value: number): number {
+        if (propertyPeriodTicks === undefined || (!repeatsBooleans && data.timeline.spineTracks.length === 0))
+            return Infinity;
+
+        const current = tick(value);
+        const cycle = Math.floor(current / propertyPeriodTicks);
+        const offset = current % propertyPeriodTicks;
+        const next = repeatingBoundaries.find((time) => time > offset) ?? propertyPeriodTicks;
+
+        return (cycle * propertyPeriodTicks + next) * 1e-12;
+    }
 
     function check() {
         if (disposed)
@@ -105,7 +129,13 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
     }
 
     function pose() {
-        forActiveSpines((spine) => spine.applyPose());
+        forActiveSpines((spine) => {
+            if (duration !== null || !tracks.some((track) => track.spine === spine && track.holdsPose))
+                spine.applyPose();
+        });
+
+        if (refreshAfterPose)
+            graph.refresh();
     }
 
     function update(delta: number) {
@@ -120,7 +150,7 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
         properties!.evaluate(propertyTime);
 
         for (const track of tracks)
-            track.evaluate(value);
+            track.evaluate(duration === null ? propertyTime : value);
 
         pose();
     }
@@ -137,7 +167,7 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
             while (frame / 120 <= poseTime)
                 frame++;
 
-            const next = Math.min(frame / 120, boundaries[boundaryIndex] ?? duration ?? Infinity);
+            const next = Math.min(frame / 120, boundaries[boundaryIndex] ?? duration ?? Infinity, nextRepeatingBoundary(poseTime));
 
             if (
                 next > target && (duration === null
@@ -193,11 +223,7 @@ export function createCutsceneTimeline(scene: CutsceneScene, graph: CutsceneGrap
                 spine.skeleton.scaleX = component.flipX ? -1 : 1;
                 spine.skeleton.scaleY = component.flipY ? -1 : 1;
 
-                if (component.initialAnimation !== null)
-                    spine.state.setAnimation(0, component.initialAnimation, component.initialLoop);
-
-                spine.update(0);
-                spine.applyPose();
+                spine.initializePose(component.initialAnimation, component.initialLoop, component.initialMixSeconds);
             }
         }
 
