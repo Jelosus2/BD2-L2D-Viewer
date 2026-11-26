@@ -1,5 +1,14 @@
 export default [
   {
+    "date": "19/11/2026",
+    "changes": [
+      "Added Venaka: Cheers to Victory icon and voices.",
+      "Added Venaka: Cheers to Victory standing animations.",
+      "Added Venaka: Cheers to Victory ultimate animations.",
+      "As always, if you like my work and want to support me so I can keep working on adding more features and improving the site you can do so by donating in either my Ko-Fi or Patreon <3."
+    ]
+  },
+  {
     "date": "05/11/2026",
     "changes": [
       "Added Valze: Night of Betrayal and Liatris: Sweet Temptation icons and voices.",

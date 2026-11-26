@@ -4,7 +4,7 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-packageExtensionsChecksum: sha256-HSoJ025QaydpL+7u+97kVpY4mJYOOYJLb4m4Qz0x9z8=
+packageExtensionsChecksum: sha256-OiGEAWOwMa5UmgFXAB2DQ0fb2195T2WwQC3pMycQ+9Q=
 
 importers:
 
@@ -16,6 +16,9 @@ importers:
       '@esotericsoftware/spine-player':
         specifier: 4.1.56
         version: 4.1.56
+      '@esotericsoftware/spine-player-4.2':
+        specifier: npm:@esotericsoftware/spine-player@4.2.120
+        version: '@esotericsoftware/spine-player@4.2.120'
       '@tailwindcss/vite':
         specifier: ^4.1.10
         version: 4.1.10(vite@8.1.2(@types/node@22.15.32)(jiti@2.4.2))
@@ -169,8 +172,14 @@ packages:
   '@esotericsoftware/spine-player@4.1.56':
     resolution: {integrity: sha512-J4xUUNgoJJM023rm+YvzhxC3XjiZAAAYjHYp+WI7cNDX/q+aXQjaC6Gr6RxlntvuDzzpwEb4y/F8Oz4pFVQlUw==}
 
+  '@esotericsoftware/spine-player@4.2.120':
+    resolution: {integrity: sha512-N3LVJp0DkyK/h4AntTDedwDqLxrWYK9gedi0qWcrstgu/h7RYfdrXviza8qKt11v5dlyWpZACWbXLGicWbqfFA==}
+
   '@esotericsoftware/spine-webgl@4.1.56':
     resolution: {integrity: sha512-LNr/X4B81/rC96mzFV+L5LPnqaIj1v3RBCKTagmFlAd/2MtXcxwEatIQVPq487NigFwlrkvmxQuMpl1TRf3xxw==}
+
+  '@esotericsoftware/spine-webgl@4.2.120':
+    resolution: {integrity: sha512-xhITm18dZ6DclPaI1jEiTVOoXYQASsubbDEs3Ik1AjmVSXdNFtvdvzLVwhPQ8eHu1OXsxtWfuW+wpGHib8V4hw==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -1882,9 +1891,18 @@ snapshots:
       '@esotericsoftware/spine-core': 4.1.56
       '@esotericsoftware/spine-webgl': 4.1.56
 
+  '@esotericsoftware/spine-player@4.2.120':
+    dependencies:
+      '@esotericsoftware/spine-core': 4.2.120
+      '@esotericsoftware/spine-webgl': 4.2.120
+
   '@esotericsoftware/spine-webgl@4.1.56':
     dependencies:
       '@esotericsoftware/spine-core': 4.1.56
+
+  '@esotericsoftware/spine-webgl@4.2.120':
+    dependencies:
+      '@esotericsoftware/spine-core': 4.2.120
 
   '@humanfs/core@0.19.1': {}
 

@@ -11,11 +11,13 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
+    "test:spine-runtime": "node --test scripts/spine-runtime.test.mjs",
     "lint": "eslint . --fix"
   },
   "dependencies": {
     "@esotericsoftware/spine-pixi-v7": "4.2.120",
     "@esotericsoftware/spine-player": "4.1.56",
+    "@esotericsoftware/spine-player-4.2": "npm:@esotericsoftware/spine-player@4.2.120",
     "@tailwindcss/vite": "^4.1.10",
     "jszip": "^3.10.1",
     "mediabunny": "^1.56.1",
