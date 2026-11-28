@@ -3,7 +3,7 @@ import type { StandingScene } from "@/data/loadStandingScene";
 import { readAsset } from "@/data/readAsset";
 import { resolveRectLayout } from "./resolveRectLayout";
 import { SceneSlotMesh } from "./SceneSlotMesh";
-import { ALPHA_MODES, Application, BaseTexture, Container, extensions } from "pixi.js";
+import { ALPHA_MODES, Application, BaseTexture, Container, extensions, type FederatedPointerEvent } from "pixi.js";
 import {
     AtlasAttachmentLoader,
     DarkTintRenderer,
@@ -15,14 +15,29 @@ import {
 
 extensions.add(DarkTintRenderer);
 
-export async function createStandingPreview(host: HTMLElement, scene: StandingScene, signal: AbortSignal): Promise<{ dispose(): void }> {
+export interface StandingPlayer {
+    dispose(): void;
+    animations: string[];
+    skins: string[];
+    setAnimation(name: string): void;
+    setSkin(name: string): void;
+    setPlaying(value: boolean): void;
+    setSpeed(value: number): void;
+    zoomBy(factor: number): void;
+    resetView(): void;
+}
+
+export async function createStandingPreview(host: HTMLElement, scene: StandingScene, signal: AbortSignal, onInteract?: () => boolean | void): Promise<StandingPlayer> {
     const controller = new AbortController();
     const textures: BaseTexture[] = [];
     let atlas: TextureAtlas | undefined;
     let app: Application<HTMLCanvasElement> | undefined;
     let observer: ResizeObserver | undefined;
     let onVisibility: (() => void) | undefined;
+    let removeInteraction: (() => void) | undefined;
     let disposed = false;
+    let playing = true;
+    let speed = 1;
 
     function dispose() {
         if (disposed)
@@ -33,6 +48,7 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
         controller.abort();
         signal.removeEventListener("abort", dispose);
         observer?.disconnect();
+        removeInteraction?.();
 
         if (onVisibility)
             document.removeEventListener("visibilitychange", onVisibility);
@@ -155,8 +171,43 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
             slotMeshFactory: () => new SceneSlotMesh()
         });
 
+        const camera = new Container();
         const canvasRoot = new Container();
-        application.stage.addChild(canvasRoot);
+
+        application.stage.addChild(camera);
+        camera.addChild(canvasRoot);
+
+        const view = { x: 0, y: 0, zoom: 1 };
+
+        function updateCamera() {
+            camera.pivot.set(host.clientWidth / 2, host.clientHeight / 2);
+            camera.position.set(
+                host.clientWidth / 2 + view.x,
+                host.clientHeight / 2 + view.y
+            );
+
+            camera.scale.set(view.zoom);
+            application.render();
+        }
+
+        function zoomBy(factor: number) {
+            if (disposed)
+                return;
+
+            if (!Number.isFinite(factor) || factor <= 0)
+                throw new Error("Invalid zoom factor.");
+
+            view.zoom = Math.min(4, Math.max(0.25, view.zoom * factor));
+            updateCamera();
+        }
+
+        function resetView() {
+            if (disposed)
+                return;
+
+            Object.assign(view, { x: 0, y: 0, zoom: 1 });
+            updateCamera();
+        }
 
         let parent = canvasRoot;
         const containers = scene.nodes.map((node) => {
@@ -186,14 +237,125 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
         for (const mix of media.mixes)
             spine.state.data.setMix(mix.from, mix.to, mix.seconds);
 
-        startupSequence.forEach((entry, index) => {
-            if (index === 0)
-                spine.state.setAnimation(0, entry.animation, entry.loop);
-            else
-                spine.state.addAnimation(0, entry.animation, entry.loop, 0);
+        function setAnimation(name: string) {
+            if (disposed)
+                return;
+
+            if (name && !data.findAnimation(name))
+                throw new Error(`Animation not found: ${name}`);
+
+            spine.state.clearTracks();
+            spine.skeleton.setToSetupPose();
+            spine.skeleton.physicsConstraints.forEach((constraint) => constraint.reset());
+
+            const sequence = name
+                ? [{ animation: name, loop: true }]
+                : startupSequence;
+
+            sequence.forEach((entry, index) => {
+                if (index === 0)
+                    spine.state.setAnimation(0, entry.animation, entry.loop);
+                else
+                    spine.state.addAnimation(0, entry.animation, entry.loop, 0);
+            });
+
+            spine.update(0);
+            application.render();
+        }
+
+        setAnimation("");
+
+        function setSkin(name: string) {
+            if (disposed)
+                return;
+
+            spine.skeleton.setSkinByName(name || component.skin);
+            spine.skeleton.setSlotsToSetupPose();
+            spine.update(0);
+            application.render();
+        }
+
+        let gesture: { id: number; x: number; y: number; moved: boolean } | undefined;
+        let pan: { id: number; x: number; y: number; moved: boolean } | undefined;
+
+        function pointerDown(event: PointerEvent) {
+            pan = event.button === 0 && event.isPrimary
+                ? { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }
+                : undefined;
+        }
+
+        function pointerMove(event: PointerEvent) {
+            if (gesture?.id === event.pointerId && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8)
+                gesture.moved = true;
+
+            if (!pan || pan.id !== event.pointerId || !pan.moved && Math.hypot(event.clientX - pan.x, event.clientY - pan.y) <= 8)
+                return;
+
+            pan.moved = true;
+            const bounds = application.view.getBoundingClientRect();
+
+            if (bounds.width > 0 && bounds.height > 0)
+            {
+                view.x += (event.clientX - pan.x) * host.clientWidth / bounds.width;
+                view.y += (event.clientY - pan.y) * host.clientHeight / bounds.height;
+            }
+
+            pan.x = event.clientX;
+            pan.y = event.clientY;
+
+            updateCamera();
+        }
+
+        function clearGesture() {
+            gesture = undefined;
+            pan = undefined;
+        }
+
+        spine.eventMode = "static";
+        spine.on("pointerdown", (event: FederatedPointerEvent) => {
+            gesture = event.button === 0 && event.isPrimary
+                ? { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }
+                : undefined;
         });
 
-        spine.update(0);
+        spine.on("pointertap", (event: FederatedPointerEvent) => {
+            const click = gesture;
+            gesture = undefined;
+
+            const current = spine.state.getCurrent(0);
+            const motion = data.findAnimation("motion");
+            if (
+                !playing || !click || click.id !== event.pointerId || click.moved ||
+                Math.hypot(event.clientX - click.x, event.clientY - click.y) > 8 ||
+                current?.animation?.name !== "idle" || current.next || !motion ||
+                !data.findAnimation("idle") || onInteract?.() === false
+            )
+            {
+                return;
+            }
+
+            spine.state.setAnimation(0, "motion", false);
+            spine.state.addAnimation(0, "idle", true, motion.duration);
+        });
+
+        window.addEventListener("pointermove", pointerMove, true);
+        window.addEventListener("pointerup", clearGesture);
+        window.addEventListener("pointercancel", clearGesture);
+        window.addEventListener("blur", clearGesture);
+
+        application.view.style.touchAction = "none";
+        application.view.addEventListener("pointerdown", pointerDown);
+
+        removeInteraction = () => {
+            window.removeEventListener("pointermove", pointerMove, true);
+            window.removeEventListener("pointerup", clearGesture);
+            window.removeEventListener("pointercancel", clearGesture);
+            window.removeEventListener("blur", clearGesture);
+            application.view.removeEventListener("pointerdown", pointerDown);
+
+            gesture = undefined;
+            pan = undefined;
+        };
 
         function resize() {
             if (disposed)
@@ -230,6 +392,8 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
                 parentSize = resolved.size;
                 parentPivot = layout.pivot;
             });
+
+            updateCamera();
         }
 
         observer = new ResizeObserver(resize);
@@ -237,11 +401,11 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
         resize();
 
         application.ticker.add(() => {
-            spine.update(Math.min(application.ticker.deltaMS / 1000, 0.05));
+            spine.update(Math.min(application.ticker.deltaMS / 1000, 0.05) * speed);
         });
 
         onVisibility = () => {
-            if (document.hidden)
+            if (document.hidden || !playing)
                 application.stop();
             else
                 application.start();
@@ -251,7 +415,28 @@ export async function createStandingPreview(host: HTMLElement, scene: StandingSc
         application.render();
         onVisibility();
 
-        return { dispose };
+        return {
+            dispose,
+            animations: data.animations.map((animation) => animation.name),
+            skins: data.skins.map((skin) => skin.name),
+            setAnimation,
+            setSkin,
+            setPlaying(value) {
+                if (disposed)
+                    return;
+
+                playing = value;
+                onVisibility?.();
+            },
+            setSpeed(value) {
+                if (!Number.isFinite(value) || value < 0.1 || value > 4)
+                    throw new Error("Invalid animation speed.");
+
+                speed = value;
+            },
+            zoomBy,
+            resetView
+        };
     }
     catch (error)
     {

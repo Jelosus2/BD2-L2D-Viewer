@@ -2,7 +2,7 @@ import type { AudioCue } from "@/types/audio";
 
 export interface CutsceneAudioPlayback {
     readonly time: number;
-    play(timeSeconds: number): void;
+    play(timeSeconds: number, speed?: number): void;
     pause(): void;
     dispose(): void;
 }
@@ -36,6 +36,7 @@ export function createCutsceneAudioPlayback(
 
     const voices = new Set<{ source: AudioBufferSourceNode; gain: GainNode }>();
     let position = 0;
+    let rate = 1;
     let startedAt = 0;
     let running = false;
     let disposed = false;
@@ -46,7 +47,7 @@ export function createCutsceneAudioPlayback(
     }
 
     function time() {
-        return position + (running ? Math.max(0, context.currentTime - startedAt) : 0);
+        return position + (running ? Math.max(0, context.currentTime - startedAt) * rate : 0);
     }
 
     function release(voice: { source: AudioBufferSourceNode; gain: GainNode }) {
@@ -68,15 +69,18 @@ export function createCutsceneAudioPlayback(
         get time() {
             return time();
         },
-        play(timeSeconds) {
+        play(timeSeconds, speed = rate) {
             check();
 
             if (!Number.isFinite(timeSeconds) || timeSeconds < 0)
                 throw new Error("Invalid cutscene audio time.");
+            if (!Number.isFinite(speed) || speed < 0.1 || speed > 4)
+                throw new Error("Invalid cutscene audio speed.");
             if (context.state === "closed")
                 throw new Error("Cutscene audio context has been closed.");
 
             stopVoices();
+            rate = speed;
             position = timeSeconds;
             startedAt = context.currentTime;
             running = true;
@@ -93,6 +97,7 @@ export function createCutsceneAudioPlayback(
                     const voice = { source, gain };
 
                     source.buffer = clip.buffer;
+                    source.playbackRate.value = rate;
                     gain.gain.value = clip.gain;
                     source.onended = () => release(voice);
 
@@ -101,9 +106,9 @@ export function createCutsceneAudioPlayback(
                         source.connect(gain);
                         gain.connect(output);
                         source.start(
-                            startedAt + Math.max(0, clip.start - timeSeconds),
+                            startedAt + Math.max(0, clip.start - timeSeconds) / rate,
                             clip.offset + Math.max(0, timeSeconds - clip.start),
-                            clip.end - Math.max(timeSeconds, clip.start),
+                            clip.end - Math.max(timeSeconds, clip.start)
                         );
                         voices.add(voice);
                     }

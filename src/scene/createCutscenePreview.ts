@@ -6,7 +6,7 @@ import { createCutsceneGraph } from "@/spine/createCutsceneGraph";
 import { createCutsceneTimeline } from "@/scene/createCutsceneTimeline";
 import { loadCutsceneAudio } from "@/audio/loadCutsceneAudio";
 import { createCutsceneAudioPlayback } from "@/audio/createCutsceneAudioPlayback";
-import { Application, Renderer } from "pixi.js";
+import { Application, Renderer, Container } from "pixi.js";
 
 export interface CutscenePreviewSnapshot {
     time: number;
@@ -20,6 +20,9 @@ export interface CutscenePreview {
     replay(): Promise<void>;
     seek(timeSeconds: number): void;
     dispose(): void;
+    setSpeed(value: number): void;
+    zoomBy(factor: number): void;
+    resetView(): void;
 }
 
 export async function createCutscenePreview(
@@ -47,6 +50,8 @@ export async function createCutscenePreview(
     let audioRunning = false;
     let commandVersion = 0;
     let wasHidden = document.hidden;
+    let speed = 1;
+    let removeInteraction: (() => void) | undefined;
 
     function dispose() {
         if (disposed)
@@ -57,6 +62,7 @@ export async function createCutscenePreview(
 
         cancelAnimationFrame(frame);
         observer?.disconnect();
+        removeInteraction?.();
         signal.removeEventListener("abort", dispose);
         document.removeEventListener("visibilitychange", visibility);
 
@@ -106,7 +112,7 @@ export async function createCutscenePreview(
 
         const delta = playing && audio
             ? Math.max(0, audio.time - timeline!.time)
-            : Math.max(0, now - last) / 1000;
+            : Math.max(0, now - last) / 1000 * speed;
 
         timeline!.advance(delta);
         last = now;
@@ -164,7 +170,7 @@ export async function createCutscenePreview(
 
             if (wasHidden && audioRunning)
             {
-                audio!.play(audio!.time);
+                audio!.play(audio!.time, speed);
                 const version = commandVersion;
 
                 void audioContext!.resume().catch((error) => {
@@ -232,7 +238,7 @@ export async function createCutscenePreview(
             throw new Error("Could not start cutscene audio playback.");
 
         command(() => {
-            audio?.play(timeline!.time);
+            audio?.play(timeline!.time, speed);
             audioRunning = audio !== undefined;
 
             if (document.hidden)
@@ -296,7 +302,80 @@ export async function createCutscenePreview(
             renderer.texture.bind(texture);
         }
 
-        app.stage.addChild(graph.root);
+        const application = app;
+        const camera = new Container();
+        const view = { x: 0, y: 0, zoom: 1 };
+
+        application.stage.addChild(camera);
+        camera.addChild(graph.root);
+
+        function updateCamera() {
+            camera.pivot.set(host.clientWidth / 2, host.clientHeight / 2);
+            camera.position.set(host.clientWidth / 2 + view.x, host.clientHeight / 2 + view.y);
+            camera.scale.set(view.zoom);
+
+            draw();
+        }
+
+        let pan: { id: number; x: number; y: number; moved: boolean } | undefined;
+
+        function pointerDown(event: PointerEvent) {
+            pan = event.button === 0 && event.isPrimary
+                ? { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }
+                : undefined;
+        }
+
+        function pointerMove(event: PointerEvent) {
+            if (!pan || pan.id !== event.pointerId)
+                return;
+
+            if (!(event.buttons & 1))
+            {
+                pan = undefined;
+                return;
+            }
+
+            if (!pan.moved && Math.hypot(event.clientX - pan.x, event.clientY - pan.y) <= 8)
+                return;
+
+            pan.moved = true;
+
+            const bounds = application.view.getBoundingClientRect();
+
+            if (bounds.width > 0 && bounds.height > 0)
+            {
+                view.x += (event.clientX - pan.x) * host.clientWidth / bounds.width;
+                view.y += (event.clientY - pan.y) * host.clientHeight / bounds.height;
+            }
+
+            pan.x = event.clientX;
+            pan.y = event.clientY;
+
+            updateCamera();
+        }
+
+        function clearPan() {
+            pan = undefined;
+        }
+
+        application.view.style.touchAction = "none";
+        application.view.addEventListener("pointerdown", pointerDown);
+
+        window.addEventListener("pointermove", pointerMove, true);
+        window.addEventListener("pointerup", clearPan);
+        window.addEventListener("pointercancel", clearPan);
+        window.addEventListener("blur", clearPan);
+
+        removeInteraction = () => {
+            application.view.removeEventListener("pointerdown", pointerDown);
+            window.removeEventListener("pointermove", pointerMove, true);
+            window.removeEventListener("pointerup", clearPan);
+            window.removeEventListener("pointercancel", clearPan);
+            window.removeEventListener("blur", clearPan);
+
+            pan = undefined;
+        };
+
         app.view.setAttribute("aria-label", "Cutscene preview");
         app.view.setAttribute("role", "img");
 
@@ -322,7 +401,7 @@ export async function createCutscenePreview(
             graph!.root.scale.set(scale);
             graph!.resize({ x: width / scale, y: height / scale });
 
-            draw();
+            updateCamera();
         }
 
         observer = new ResizeObserver(resize);
@@ -372,13 +451,54 @@ export async function createCutscenePreview(
 
                     if (playing && audio)
                     {
-                        audio.play(timeline!.time);
+                        audio.play(timeline!.time, speed);
                         audioRunning = true;
 
                         if (document.hidden)
                             audio.pause();
                     }
                 });
+            },
+            setSpeed(value) {
+                if (!Number.isFinite(value) || value < 0.1 || value > 4)
+                    throw new Error("Invalid cutscene speed.");
+
+                if (value === speed)
+                    return;
+
+                command(() => {
+                    if (!document.hidden)
+                        advance();
+
+                    const audioTime = audio?.time;
+                    audio?.pause();
+                    speed = value;
+
+                    if (audio && audioRunning)
+                    {
+                        audio.play(audioTime!, speed);
+
+                        if (document.hidden)
+                            audio.pause();
+                    }
+                });
+            },
+            zoomBy(factor) {
+                if (disposed)
+                    return;
+
+                if (!Number.isFinite(factor) || factor <= 0)
+                    throw new Error("Invalid zoom factor.");
+
+                view.zoom = Math.min(4, Math.max(0.25, view.zoom * factor));
+                updateCamera();
+            },
+            resetView() {
+                if (disposed)
+                    return;
+
+                Object.assign(view, { x: 0, y: 0, zoom: 1 });
+                updateCamera();
             },
             dispose
         };

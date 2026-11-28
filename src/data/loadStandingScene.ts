@@ -77,9 +77,6 @@ export async function loadStandingScene(catalogUrl: string, signal: AbortSignal)
         };
     });
 
-    const last = nodes[nodes.length - 1];
-    check(last.layout.pivot.x === 0.5 && last.layout.pivot.y === 0.5, "Spine node requires a centered pivot");
-
     const profileIds = new Set<string>();
     const orientations = new Set<string>();
 
@@ -97,8 +94,6 @@ export async function loadStandingScene(catalogUrl: string, signal: AbortSignal)
             ids.every((nodeId) => Object.prototype.hasOwnProperty.call(overrides, nodeId)), "profile node mismatch");
 
         const nodeLayouts = Object.fromEntries(ids.map((nodeId) => [nodeId, rect(overrides[nodeId])]));
-        check(nodeLayouts[last.id].pivot.x === 0.5 && nodeLayouts[last.id].pivot.y === 0.5,
-            "Spine profile requires a centered pivot");
 
         return { id, orientation, referenceSize: vector(profile.referenceSize, Number.MIN_VALUE), nodeLayouts };
     });

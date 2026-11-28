@@ -8,6 +8,7 @@ export interface CutscenePreviewEntry {
 }
 
 export interface CutscenePreviewIndex {
+    revision: string;
     defaultId: string;
     items: CutscenePreviewEntry[];
 }
@@ -49,5 +50,5 @@ export async function loadCutscenePreviewIndex(signal: AbortSignal): Promise<Cut
     check(typeof defaultId === "string" && ids.has(defaultId), "missing default preview");
 
     signal.throwIfAborted();
-    return { defaultId, items };
+    return { revision: data.revision, defaultId, items };
 }
